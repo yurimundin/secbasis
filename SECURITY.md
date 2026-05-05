@@ -13,7 +13,6 @@ Se você descobriu uma vulnerabilidade de segurança no Sec.Basis,
 **NÃO abra uma issue pública**. Reporte de forma responsável:
 
 - **E-mail:** security@basis.app.br
-- Também disponível via [security.txt (RFC 9116)](https://basis.app.br/.well-known/security.txt).
 - **Tempo de resposta esperado:** confirmação de recebimento em até **48 horas**, primeira análise em até **7 dias**.
 - **PGP key:** _TODO — adicionar quando o e-mail dedicado for configurado._
 
@@ -58,7 +57,6 @@ If you discovered a security vulnerability in Sec.Basis, **DO NOT open a
 public issue**. Report it responsibly:
 
 - **Email:** security@basis.app.br
-- Also available via [security.txt (RFC 9116)](https://basis.app.br/.well-known/security.txt).
 - **Expected response time:** acknowledgement within **48 hours**, initial analysis within **7 days**.
 - **PGP key:** _TODO — to be added once the dedicated email is configured._
 
