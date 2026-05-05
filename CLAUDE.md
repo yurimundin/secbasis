@@ -769,6 +769,14 @@ Repositório público: <https://github.com/yurimundin/secbasis>
 
 | Hash | Tipo | Descrição |
 |---|---|---|
+| `d2cc329` | docs | document smoke test gating strategy (CLAUDE.md §26) (S10 Tarefa C) |
+| `8d79212` | chore | update zustand and shadcn to latest patch/minor (S10 Tarefa B) |
+| `f9aedcc` | chore | sync Cargo.toml version with project manifests (0.1.0-alpha) (S9 hk) |
+| `3082075` | chore | sync package-lock.json version with package.json (0.1.0-alpha) (S9 hk) |
+| `2800448` | docs | document Linux-only transitive vulnerability analysis (CLAUDE.md §25) (S9) |
+| `a08f14f` | feat | redesign unlock screen + auto-open last vault (S8) |
+| `05e6ef1` | feat | add SemVer versioning and About dialog (S7) |
+| `47a82fb` | docs | close Session 5 deliverables (stale text, history, roadmap) (S6) |
 | `a762eb3` | feat | polish recycle bin UX (i18n + empty state) (Tarefa 3 da S5) |
 | `e36c275` | feat | empty recycle bin (hard-delete all trashed entries) (Tarefa 2) |
 | `8e741ae` | feat | restore entries from recycle bin (Tarefa 1 da S5) |
@@ -837,9 +845,61 @@ de correção.
     `kdbx.move(entry, undefined)`)
   - Tarefa 3 (`a762eb3`): polimento UX (i18n "Recycle Bin" → "Lixeira"
     em renderização, estado vazio educativo)
+- ✅ **Sessão 6 — Encerramento** (`47a82fb`): limpeza de dívidas
+  documentais (texto stale em `useDeleteEntry.ts`, atualização do §14
+  com marcos das Sessões 4.5 e 5, atualização do Roadmap Fase 1 do
+  README com ciclo de vida da Lixeira).
+- ✅ **Sessão 7 — Versionamento e tela About** (`05e6ef1`):
+  - SemVer adotado: `MAJOR.MINOR.PATCH[-pre-release]`, versão atual
+    `0.1.0-alpha`. Source of truth: `tauri.conf.json`.
+  - Tela About acessível via botão Info no header (logo + título +
+    versão + descrição + 3 links + Fechar).
+  - Hook `useAppVersion()` lê via Tauri API.
+  - Documentação em §23.
+- ✅ **Sessão 8 — Redesign tela de unlock + auto-open último cofre**
+  (`a08f14f`):
+  - Logo Sec.Basis 96px substitui ícone de cadeado pequeno.
+  - Hierarquia visual: logo → título → tagline → card → footer.
+  - Sistema de espaçamento Tailwind (`gap-2/4/6/8`, `p-8`).
+  - Auto-open: pré-preenche path do último cofre via
+    `lastOpenedVaultPath` em `useSettingsStore` (localStorage). Senha
+    mestra SEMPRE exigida (segurança).
+  - Fallback silencioso: se arquivo sumiu, cai em OpenCreateScreen.
+  - Documentação em §24.
+- ✅ **Sessão 9 — Análise + dispensa de Dependabot alert** (`2800448`):
+  - Vulnerability moderada em `glib < 0.20.0` (memory safety,
+    NULL pointer dereference em `VariantStrIter::impl_get`).
+  - Investigação via `cargo tree --target x86_64-pc-windows-msvc`
+    confirmou que glib é dependência Linux-only (gtk + webkit2gtk +
+    wry stack) e NÃO está no binário Windows.
+  - Alerta dispensado no GitHub como "Risk tolerable" com referência
+    a §25 do CLAUDE.md (que estabelece processo para vulnerabilidades
+    transitivas Linux-only).
+  - Setup de máquina nova Windows (Build Tools + Rust + Tauri) também
+    foi parte desta sessão.
+- ✅ **Sessão 9.5 — Housekeeping pós-Sessão 9** (`3082075` + `f9aedcc`):
+  - Sync `package-lock.json` para `0.1.0-alpha` (capturado por
+    `npm install` em máquina nova; Sessão 7 deixou inconsistência).
+  - Sync `Cargo.toml` para `0.1.0-alpha` (TODO flagged na Sessão 7).
+  - Convenção de commit cravada: SEM trailer `Co-Authored-By`.
+- ✅ **Sessão 10 — Updates de dependências + documentação smoke test**
+  (`8d79212` + `d2cc329`):
+  - zustand 5.0.12 → 5.0.13 (patch — bug fixes).
+  - shadcn 4.6.0 → 4.7.0 (CLI tool minor; componentes vendorizados
+    em `src/components/ui/` inalterados).
+  - Migração do projeto de `Downloads/` para `C:\dev\secbasis` (Smart
+    App Control bloqueava error 4551 em pastas com Mark-of-the-Web).
+  - Documentação do smoke test em §26 (gating strategy via
+    `import.meta.env.DEV` + dynamic import para tree-shaking).
+  - Lição operacional registrada: investigar antes de marcar dívida
+    técnica (Sessão 9 tinha flagged smoke test como "cleanup TODO"
+    sem investigar; Sessão 10 confirmou que arquitetura estava sólida).
 
-**Próximo:** Sessão 7 — busca em tempo real e/ou subgrupos expansíveis
-na sidebar (itens 🚧 do Roadmap Fase 1).
+**Próximo:** Sessão 11 — busca em tempo real, subgrupos expansíveis
+na sidebar, ou empacotamento Windows (itens 🚧 do Roadmap Fase 1).
+Outras pendências: rollback in-memory em erros de save, code-splitting,
+CI básico (GitHub Actions), major upgrades de deps (vite 7→8,
+typescript 5→6).
 
 ---
 
@@ -1629,7 +1689,7 @@ quando há um Kdbx ativo.
 - Persistir auto-lock state entre boots (intencionalmente NÃO — o
   auto-lock é um evento de sessão, não estado durável)
 
-## §25 — Vulnerabilidades transitivas Linux-only (Sessão 9)
+## 25. Vulnerabilidades transitivas Linux-only (Sessão 9)
 
 **Contexto:** Dependabot pode reportar vulnerabilidades em crates Rust
 que são dependências transitivas do `tauri-runtime-wry` mas que
@@ -1675,7 +1735,7 @@ Se aparecer no Linux mas não no Windows, é definitivamente Linux-only.
   unsoundness. Dispensado como "Risk tolerable — vulnerable code not
   compiled into Windows binary".
 
-## §26 — Smoke test do pipeline cripto (boot do app)
+## 26. Smoke test do pipeline cripto (boot do app)
 
 **Contexto:** Sec.Basis valida no boot que o pipeline cripto (Argon2id
 nativo + kdbxweb round-trip) está funcional. Útil para detectar

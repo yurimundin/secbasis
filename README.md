@@ -95,6 +95,8 @@ Princípios de design que guiam o projeto:
   - ✅ Auto-lock e auto-clear de clipboard
   - ✅ Persistência atômica com backup `.kdbx.bak`
   - ✅ Ciclo de vida completo da Lixeira (mover, restaurar, esvaziar — compatível com KeePass)
+  - ✅ Auto-open do último cofre usado (estilo KeePass — pré-preenche path, senha sempre exigida)
+  - ✅ Tela "Sobre" com versão e links (acessível pelo botão Info no header)
   - 🚧 Busca em tempo real
   - 🚧 Subgrupos expansíveis na sidebar
   - 🚧 Empacotamento e distribuição Windows (instalador .msi/.exe via site oficial)
