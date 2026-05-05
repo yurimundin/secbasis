@@ -259,19 +259,35 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         : {},
     ),
 
-  cancelEdit: () =>
+  cancelEdit: () => {
+    // Higiene de memória: zerar a string de senha do draft antes de
+    // descartar. Strings em JS são imutáveis (a "zeragem" reatribui a
+    // property pra `""` e libera a referência da senha original pro GC),
+    // então NÃO é defesa contra memory dump do processo — é boa prática
+    // que reduz a janela de tempo em que a senha fica em heap acessível
+    // por outras referências. A defesa real continua sendo o
+    // `ProtectedValue` da kdbxweb depois do commit.
+    const state = get();
+    if (state.draftEntry) state.draftEntry.password = "";
+    if (state.originalDraft) state.originalDraft.password = "";
     set({
       editMode: "view",
       draftEntry: null,
       originalDraft: null,
-    }),
+    });
+  },
 
-  exitToViewMode: () =>
+  exitToViewMode: () => {
+    // Mesma higiene de memória do `cancelEdit`. Ver comentário acima.
+    const state = get();
+    if (state.draftEntry) state.draftEntry.password = "";
+    if (state.originalDraft) state.originalDraft.password = "";
     set({
       editMode: "view",
       draftEntry: null,
       originalDraft: null,
-    }),
+    });
+  },
 
   incrementVaultVersion: () =>
     set((state) => ({ vaultVersion: state.vaultVersion + 1 })),
@@ -375,6 +391,17 @@ function draftsEqual(a: EntryDraft, b: EntryDraft): boolean {
     a.notes === b.notes &&
     a.groupUuid === b.groupUuid
   );
+}
+
+/**
+ * Versão síncrona / não-hook de `useHasUnsavedChanges`. Útil em handlers
+ * fora de componentes React (close-request listener do Tauri,
+ * confirmação programática de lock, etc.).
+ */
+export function getHasUnsavedChanges(): boolean {
+  const s = useVaultStore.getState();
+  if (!s.draftEntry || !s.originalDraft) return false;
+  return !draftsEqual(s.draftEntry, s.originalDraft);
 }
 
 /**

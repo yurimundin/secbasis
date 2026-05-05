@@ -10,6 +10,7 @@ import { Plus } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
+import { confirmDialog } from "@/lib/confirm";
 import {
   getAvatarColorClass,
   getInitials,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/entry-helpers";
 import { cn } from "@/lib/utils";
 import {
+  getHasUnsavedChanges,
   useEntriesOfCurrentGroup,
   useIsCurrentGroupRecycleBin,
   useVaultStore,
@@ -30,6 +32,7 @@ export function EntryList() {
   const selectedGroupUuid = useVaultStore((s) => s.selectedGroupUuid);
   const selectEntry = useVaultStore((s) => s.selectEntry);
   const enterCreateMode = useVaultStore((s) => s.enterCreateMode);
+  const exitToViewMode = useVaultStore((s) => s.exitToViewMode);
   const isRecycleBin = useIsCurrentGroupRecycleBin();
 
   const sorted = useMemo(() => {
@@ -51,18 +54,53 @@ export function EntryList() {
     btn?.focus();
   }, [selectedEntryUuid]);
 
-  function handleKeyDown(e: React.KeyboardEvent, idx: number) {
-    if (e.key === "ArrowDown" && idx < sorted.length - 1) {
-      e.preventDefault();
-      selectEntry(sorted[idx + 1].uuid.id);
-    } else if (e.key === "ArrowUp" && idx > 0) {
-      e.preventDefault();
-      selectEntry(sorted[idx - 1].uuid.id);
-    }
+  /**
+   * Guard pra trocar de entry seleccionada quando há draft pendente:
+   * confirma com o usuário antes de descartar. Retorna `true` se a troca
+   * pode prosseguir.
+   */
+  async function confirmDiscardIfDirty(message: string): Promise<boolean> {
+    if (!getHasUnsavedChanges()) return true;
+    return confirmDialog({
+      title: "Mudanças não salvas",
+      description: message,
+      confirmLabel: "Descartar e continuar",
+      cancelLabel: "Voltar e salvar",
+      variant: "danger",
+    });
   }
 
-  function handleCreate() {
+  async function handleEntryClick(uuid: string) {
+    if (uuid === selectedEntryUuid) return;
+    const ok = await confirmDiscardIfDirty(
+      "Você tem mudanças não salvas. Mudar de entrada vai descartar essas mudanças. Continuar?",
+    );
+    if (!ok) return;
+    exitToViewMode();
+    selectEntry(uuid);
+  }
+
+  async function handleKeyDown(e: React.KeyboardEvent, idx: number) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const nextIdx =
+      e.key === "ArrowDown" ? idx + 1 : e.key === "ArrowUp" ? idx - 1 : -1;
+    if (nextIdx < 0 || nextIdx >= sorted.length) return;
+    e.preventDefault();
+    const targetUuid = sorted[nextIdx].uuid.id;
+    const ok = await confirmDiscardIfDirty(
+      "Você tem mudanças não salvas. Mudar de entrada vai descartar essas mudanças. Continuar?",
+    );
+    if (!ok) return;
+    exitToViewMode();
+    selectEntry(targetUuid);
+  }
+
+  async function handleCreate() {
     if (!selectedGroupUuid || isRecycleBin) return;
+    const ok = await confirmDiscardIfDirty(
+      "Você tem mudanças não salvas. Criar uma nova entrada vai descartar essas mudanças. Continuar?",
+    );
+    if (!ok) return;
     enterCreateMode(selectedGroupUuid);
   }
 
@@ -111,8 +149,8 @@ export function EntryList() {
                 <button
                   type="button"
                   data-entry-uuid={entry.uuid.id}
-                  onClick={() => selectEntry(entry.uuid.id)}
-                  onKeyDown={(e) => handleKeyDown(e, idx)}
+                  onClick={() => void handleEntryClick(entry.uuid.id)}
+                  onKeyDown={(e) => void handleKeyDown(e, idx)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                     selected

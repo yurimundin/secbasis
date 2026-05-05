@@ -1,9 +1,12 @@
 // Painel direito em modo `edit` (entrada existente) ou `create` (nova).
 // Renderizado pelo `EntryDetail` quando `vault.editMode !== 'view'`.
 //
-// Wire-up dos handlers de salvamento e do gerador de senha vão entrar nas
-// Tarefas 4 (gerador) e 6 (commit). Por enquanto os handlers de Salvar e
-// ✨ são placeholders que apenas logam.
+// Wire-up:
+// - Salvar: chama `useCommitEdit()` (Tarefa 6) — aplica draft no Kdbx,
+//   persiste via `saveVault`, faz rollback in-memory se save falhar.
+// - Gerar senha: PasswordGenerator (Tarefa 4) preenche o campo `password`.
+// - Cancelar: ConfirmDialog local pra confirmar descarte se dirty.
+// - Atalhos: Ctrl+S salva, Esc cancela (com confirmação se dirty).
 
 import {
   ArrowLeft,
@@ -18,12 +21,13 @@ import {
   StickyNote,
   User,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCommitEdit } from "@/hooks/useCommitEdit";
 import { copyToClipboardWithAutoClear } from "@/lib/clipboard";
 import {
   useHasUnsavedChanges,
@@ -81,43 +85,79 @@ export function EntryEditor() {
   const updateDraft = useVaultStore((s) => s.updateDraft);
   const cancelEdit = useVaultStore((s) => s.cancelEdit);
   const hasUnsavedChanges = useHasUnsavedChanges();
+  const commitEdit = useCommitEdit();
 
   const [showPassword, setShowPassword] = useState(false);
   const [showTitleError, setShowTitleError] = useState(false);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
-  // Estado de "salvando" — wire real entra na Tarefa 6 (commitEdit).
-  const [busy] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Reseta show-password quando o modo ou a entry sendo editada mudam.
+  // Reseta show-password e erro do título quando o modo ou a entry
+  // sendo editada mudam.
   useEffect(() => {
     setShowPassword(false);
     setShowTitleError(false);
   }, [editMode, draft?.groupUuid]);
 
-  if (!draft || editMode === "view") return null;
-
+  // Cálculos derivados precisam vir antes dos useCallback que dependem
+  // deles.
   const isCreate = editMode === "create";
-  const titleEmpty = draft.title.trim().length === 0;
-  const canSave = isCreate ? !titleEmpty : hasUnsavedChanges && !titleEmpty;
+  const titleEmpty = draft ? draft.title.trim().length === 0 : true;
+  const canSave = isCreate
+    ? !titleEmpty
+    : hasUnsavedChanges && !titleEmpty;
 
-  function requestCancel() {
-    if (hasUnsavedChanges) {
-      setConfirmCancelOpen(true);
-    } else {
-      cancelEdit();
-    }
-  }
-
-  function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  const handleSave = useCallback(async () => {
     if (!draft) return;
     if (titleEmpty) {
       setShowTitleError(true);
       return;
     }
-    // TODO Tarefa 6: chamar `useCommitEdit()` aqui. Por enquanto só log.
-    console.warn("[EntryEditor] TODO Tarefa 6 — commitEdit não conectado");
+    setSaving(true);
+    try {
+      await commitEdit();
+    } finally {
+      setSaving(false);
+    }
+  }, [draft, titleEmpty, commitEdit]);
+
+  const requestCancel = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setConfirmCancelOpen(true);
+    } else {
+      cancelEdit();
+    }
+  }, [hasUnsavedChanges, cancelEdit]);
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    void handleSave();
   }
+
+  // Atalhos locais do editor: Ctrl+S salva, Esc cancela (com
+  // confirmação se dirty). Listener no `window` cobre o caso do foco
+  // não estar no form/inputs.
+  useEffect(() => {
+    if (editMode === "view") return;
+    function handler(e: KeyboardEvent) {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (ctrl && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void handleSave();
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        requestCancel();
+      }
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [editMode, handleSave, requestCancel]);
+
+  if (!draft || editMode === "view") return null;
+
+  const busy = saving;
 
   return (
     <section className="flex flex-col h-full overflow-hidden">

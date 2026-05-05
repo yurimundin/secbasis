@@ -66,6 +66,24 @@ export function EntryDetail() {
 
   const password = useMemo(() => (entry ? getPassword(entry) : ""), [entry]);
 
+  // Atalho Ctrl+E: em modo view com entry selecionada (e não na lixeira),
+  // entra em edit. Hook fica antes do early return pra cumprir as Rules
+  // of Hooks; condições internas garantem no-op fora do contexto certo.
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (editMode !== "view") return;
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (ctrl && e.key.toLowerCase() === "e") {
+        if (entry && !inRecycleBin) {
+          e.preventDefault();
+          enterEditMode(entry.uuid.id);
+        }
+      }
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [editMode, entry, inRecycleBin, enterEditMode]);
+
   // Switch para o editor — toda a lógica de edit/create vive lá.
   if (editMode !== "view") {
     return <EntryEditor />;

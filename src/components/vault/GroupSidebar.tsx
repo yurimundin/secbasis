@@ -7,8 +7,13 @@
 import { Folder } from "lucide-react";
 import { useEffect, useRef } from "react";
 
+import { confirmDialog } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
-import { useTopLevelGroups, useVaultStore } from "@/stores/vault";
+import {
+  getHasUnsavedChanges,
+  useTopLevelGroups,
+  useVaultStore,
+} from "@/stores/vault";
 
 export function GroupSidebar() {
   const groups = useTopLevelGroups();
@@ -30,14 +35,37 @@ export function GroupSidebar() {
     btn?.focus();
   }, [selectedGroupUuid]);
 
-  function handleKeyDown(e: React.KeyboardEvent, idx: number) {
-    if (e.key === "ArrowDown" && idx < groups.length - 1) {
-      e.preventDefault();
-      selectGroup(groups[idx + 1].uuid.id);
-    } else if (e.key === "ArrowUp" && idx > 0) {
-      e.preventDefault();
-      selectGroup(groups[idx - 1].uuid.id);
-    }
+  /**
+   * Guard pra trocar de grupo quando há draft pendente. `selectGroup` no
+   * store já limpa editMode/draft, mas precisamos confirmar com o usuário
+   * antes pra ele não perder mudanças por engano.
+   */
+  async function confirmDiscardIfDirty(): Promise<boolean> {
+    if (!getHasUnsavedChanges()) return true;
+    return confirmDialog({
+      title: "Mudanças não salvas",
+      description:
+        "Você tem mudanças não salvas. Mudar de grupo vai descartar essas mudanças. Continuar?",
+      confirmLabel: "Descartar e continuar",
+      cancelLabel: "Voltar e salvar",
+      variant: "danger",
+    });
+  }
+
+  async function handleGroupClick(uuid: string) {
+    if (uuid === selectedGroupUuid) return;
+    if (!(await confirmDiscardIfDirty())) return;
+    selectGroup(uuid);
+  }
+
+  async function handleKeyDown(e: React.KeyboardEvent, idx: number) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const nextIdx =
+      e.key === "ArrowDown" ? idx + 1 : e.key === "ArrowUp" ? idx - 1 : -1;
+    if (nextIdx < 0 || nextIdx >= groups.length) return;
+    e.preventDefault();
+    if (!(await confirmDiscardIfDirty())) return;
+    selectGroup(groups[nextIdx].uuid.id);
   }
 
   if (groups.length === 0) {
@@ -60,8 +88,8 @@ export function GroupSidebar() {
             key={g.uuid.id}
             type="button"
             data-group-uuid={g.uuid.id}
-            onClick={() => selectGroup(g.uuid.id)}
-            onKeyDown={(e) => handleKeyDown(e, idx)}
+            onClick={() => void handleGroupClick(g.uuid.id)}
+            onKeyDown={(e) => void handleKeyDown(e, idx)}
             className={cn(
               "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               selected

@@ -980,9 +980,81 @@ Convivem 2 funções de escrita em `kdbx.ts` por restrição inerente:
 Tarefa 6 conecta `saveVault` ao botão "Salvar" do `EntryEditor`.
 Tarefa 7 usa para persistir o move-to-trash.
 
-### Smoke test temporário
+### Smoke test temporário (REMOVIDO na Tarefa 6)
 
-Enquanto o save real não está conectado ao botão (Tarefa 6), o
-[main.tsx](src/main.tsx) expõe `window.__testSaveVault()` em DEV para
-teste manual via DevTools console. Marcado como `TODO REMOVER NA
-TAREFA 6` no comentário do bloco.
+Durante a Tarefa 5 (Bloco B), o [main.tsx](src/main.tsx) expunha
+`window.__testSaveVault()` em DEV para teste manual via DevTools
+console. **Bloco removido na Tarefa 6** — o save real agora vive no
+botão "Salvar" do `EntryEditor` (ver §18).
+
+---
+
+## 18. Wire-up do save (Tarefa 6 da Sessão 4)
+
+### Hook `useCommitEdit`
+
+[src/hooks/useCommitEdit.ts](src/hooks/useCommitEdit.ts) — função `()
+→ Promise<boolean>` que:
+
+1. Valida estado (cofre aberto, draft não-vazio, título não-vazio).
+2. Snapshot dos campos atuais (modo `edit`) ou referência da entry
+   recém-criada (modo `create`) para rollback.
+3. Mutação in-place do `Kdbx`: aplica `draftEntry` em `entry.fields`
+   (senha como `ProtectedValue.fromString`), chama `entry.times.update()`.
+4. `saveVault(filePath, kdbx)` (§17) — backup atômico no disco.
+5. Em sucesso: `incrementVaultVersion`, `selectEntry(entryUuid)`,
+   `exitToViewMode`, toast `"Salvo (Xms)"`.
+6. Em falha de save: **rollback in-memory** (restaura fields ou remove
+   entry recém-criada do grupo), toast vermelho com `error` do
+   backend, mantém edit mode + dirty para usuário tentar de novo.
+
+### Atalhos novos
+
+| Atalho | Quando | Ação |
+|---|---|---|
+| `Ctrl+E` | modo `view`, entry selecionada (não-lixeira) | entra em `edit` |
+| `Ctrl+S` | modo `edit`/`create` | dispara `commitEdit` |
+| `Esc` | modo `edit`/`create` | cancela (com `ConfirmDialog` se dirty) |
+
+`Ctrl+E` registrado em `EntryDetail` antes do early return (Rules of
+Hooks). `Ctrl+S` e `Esc` registrados em `EntryEditor` quando montado
+em modo edit/create.
+
+### Confirmações pra ações arriscadas com draft pendente
+
+`ConfirmDialog` programático via Promise — `confirmDialog(opts) →
+Promise<boolean>` em [src/lib/confirm.ts](src/lib/confirm.ts). Store
+interno (Zustand) acumula requests; `ConfirmDialogHost` renderiza-as
+na árvore React (`App.tsx`).
+
+Cobertura dos 4 cenários:
+
+| Cenário | Onde | Implementação |
+|---|---|---|
+| Click em outra entry com draft | `EntryList` | `confirmDiscardIfDirty` antes de `selectEntry` |
+| Click em outro grupo | `GroupSidebar` | mesmo padrão |
+| Lock manual (botão / Ctrl+L) | `requestLockWithGuard` em `lib/lock-flow.ts` | dialog se dirty; sem timeout (espera resposta indefinidamente) |
+| Auto-lock por inatividade | `useAutoLock` | `requestLockWithGuard({ autoConfirmAfterMs: 30_000 })` — dialog auto-resolve em 30s descartando e bloqueando (segurança > UX) |
+| Fechar janela do app | `useCloseRequestGuard` em `App.tsx` | intercepta `getCurrentWindow().onCloseRequested`; `event.preventDefault()` + dialog; `await w.destroy()` no confirm (`close()` re-dispararia o evento em loop) |
+
+### Higiene de memória das senhas em draft
+
+[src/stores/vault.ts](src/stores/vault.ts) — `cancelEdit` e
+`exitToViewMode` zeram `draftEntry.password` e
+`originalDraft.password` (`= ""`) antes de descartar os objetos.
+
+**Limitação:** strings em JS são imutáveis — a "zeragem" reatribui a
+property pra string vazia e libera a referência da senha original pro
+GC, mas NÃO sobrescreve a memória da string original. Defesa contra
+leitura via outras referências de mesma string, NÃO contra memory dump
+do processo. Defesa real continua sendo o `ProtectedValue` da kdbxweb
+depois do commit.
+
+### Rollback in-memory em falha de save
+
+`useCommitEdit` cuida de manter o `Kdbx` em memória consistente com o
+disco em caso de erro de I/O:
+- Modo `edit`: `Map(entry.fields)` snapshot antes de mutar; em erro,
+  `entry.fields.clear()` + restaura entries do snapshot.
+- Modo `create`: `kdbx.createEntry(group)` é chamado antes do save;
+  em erro, `group.entries.splice(idx, 1)` remove a entry órfã.

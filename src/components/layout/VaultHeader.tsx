@@ -6,13 +6,13 @@ import { Lock as LockIcon, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { requestLockWithGuard } from "@/lib/lock-flow";
 import { useHasUnsavedChanges, useVaultStore } from "@/stores/vault";
 
 import { AutoLockIndicator } from "./AutoLockIndicator";
 
 export function VaultHeader() {
   const filePath = useVaultStore((s) => s.filePath);
-  const lock = useVaultStore((s) => s.lock);
   const hasUnsavedChanges = useHasUnsavedChanges();
 
   return (
@@ -47,7 +47,7 @@ export function VaultHeader() {
       <Button
         variant="outline"
         size="sm"
-        onClick={lock}
+        onClick={() => void requestLockWithGuard()}
         title="Bloquear cofre (Ctrl+L)"
       >
         <LockIcon />

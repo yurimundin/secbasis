@@ -13,8 +13,16 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 
+import { requestLockWithGuard } from "@/lib/lock-flow";
 import { useSettingsStore } from "@/stores/settings";
 import { useVaultStore } from "@/stores/vault";
+
+/**
+ * Janela em ms pra usuário responder à confirmação "descartar mudanças?"
+ * disparada pelo auto-lock. Se não responder, o app força o bloqueio
+ * (segurança > UX). Lock manual (botão / Ctrl+L) NÃO usa timeout.
+ */
+const AUTO_LOCK_CONFIRM_TIMEOUT_MS = 30_000;
 
 interface ActivityState {
   lastActivity: number;
@@ -31,7 +39,6 @@ const useActivityStore = create<ActivityState>((set) => ({
 const MOUSE_MOVE_THROTTLE_MS = 250;
 
 export function useAutoLock(): void {
-  const lock = useVaultStore((s) => s.lock);
   const kdbx = useVaultStore((s) => s.kdbx);
   const autoLockMs = useSettingsStore((s) => s.autoLockMs);
 
@@ -57,10 +64,27 @@ export function useAutoLock(): void {
     document.addEventListener("scroll", bump, true);
     document.addEventListener("touchstart", bump);
 
+    // Flag pra evitar disparar o lock várias vezes seguidas (o tick
+    // bate a cada 1s; sem flag, dispararia o `requestLockWithGuard` em
+    // loop enquanto o dialog estiver aberto).
+    let lockInFlight = false;
+
     const tickId = window.setInterval(() => {
+      if (lockInFlight) return;
       const elapsed = Date.now() - useActivityStore.getState().lastActivity;
       if (elapsed >= autoLockMs) {
-        lock();
+        lockInFlight = true;
+        // Auto-lock confirma com o usuário se houver mudanças não-salvas;
+        // se não responder em 30s, descarta e bloqueia (defesa).
+        void requestLockWithGuard({
+          autoConfirmAfterMs: AUTO_LOCK_CONFIRM_TIMEOUT_MS,
+        }).finally(() => {
+          // Reseta a atividade — se o usuário interagiu pra cancelar o
+          // dialog (= continuar editando), não queremos disparar de
+          // novo no próximo tick.
+          useActivityStore.getState().bump();
+          lockInFlight = false;
+        });
       }
     }, 1000);
 
@@ -73,7 +97,7 @@ export function useAutoLock(): void {
       if (mouseTimer !== null) clearTimeout(mouseTimer);
       clearInterval(tickId);
     };
-  }, [kdbx, lock, autoLockMs]);
+  }, [kdbx, autoLockMs]);
 }
 
 export function useAutoLockRemainingMs(): number {

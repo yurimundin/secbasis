@@ -14,14 +14,15 @@ import { useEffect } from "react";
 
 import { copyToClipboardWithAutoClear } from "@/lib/clipboard";
 import { getPassword } from "@/lib/entry-helpers";
+import { requestLockWithGuard } from "@/lib/lock-flow";
 import { findEntryByUuidIdInDb, useVaultStore } from "@/stores/vault";
 
 export function useGlobalShortcuts(): void {
-  const lock = useVaultStore((s) => s.lock);
-
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      // Esc: desfoca elemento atual.
+      // Esc: desfoca elemento atual. Em modo edit/create, o EntryEditor
+      // tem seu próprio handler de Esc com confirmação (cancelar com
+      // dialog se dirty). Esse handler aqui é o "fallback" pra view mode.
       if (e.key === "Escape") {
         if (document.activeElement instanceof HTMLElement) {
           document.activeElement.blur();
@@ -36,7 +37,9 @@ export function useGlobalShortcuts(): void {
 
       if (key === "l") {
         e.preventDefault();
-        lock();
+        // Lock com guarda de "mudanças não salvas" (`requestLockWithGuard`
+        // confirma com o usuário se houver draft pendente).
+        void requestLockWithGuard();
         return;
       }
 
@@ -74,5 +77,5 @@ export function useGlobalShortcuts(): void {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [lock]);
+  }, []);
 }

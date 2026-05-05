@@ -2,15 +2,22 @@
 // `useVaultStore`. Sem persist do estado de cripto — fechar o app volta
 // pra tela inicial. `lastFilePath` vive em RAM (Sessão 3, Tarefa 1).
 
+import { ConfirmDialogHost } from "@/components/ConfirmDialogHost";
 import { Toaster } from "@/components/ui/sonner";
 import { OpenCreateScreen } from "@/components/vault/OpenCreateScreen";
 import { UnlockScreen } from "@/components/vault/UnlockScreen";
 import { VaultLayout } from "@/components/layout/VaultLayout";
+import { useCloseRequestGuard } from "@/hooks/useCloseRequestGuard";
 import { useVaultStore } from "@/stores/vault";
 
 function App() {
   const kdbx = useVaultStore((s) => s.kdbx);
   const lastFilePath = useVaultStore((s) => s.lastFilePath);
+
+  // Intercepta o "fechar janela" do Tauri pra confirmar quando há draft
+  // não-salvo. Hook seguro pra rodar em qualquer estado (no-op se não
+  // houver dirty).
+  useCloseRequestGuard();
 
   let screen: React.ReactNode;
   if (kdbx) {
@@ -25,6 +32,7 @@ function App() {
     <>
       {screen}
       <Toaster position="bottom-right" />
+      <ConfirmDialogHost />
     </>
   );
 }
