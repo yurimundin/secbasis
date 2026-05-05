@@ -405,6 +405,24 @@ export function getHasUnsavedChanges(): boolean {
 }
 
 /**
+ * UUID-id (string) do grupo Lixeira, ou `null` se o cofre ainda não tem
+ * Lixeira configurada. Usado pela sidebar pra diferenciar visualmente o
+ * grupo Lixeira dos demais (ícone Trash2 em vez de Folder). Depende de
+ * `vaultVersion` porque `meta.recycleBinUuid` é setado por
+ * `createRecycleBin` em mutações in-place.
+ */
+export function useRecycleBinUuidId(): string | null {
+  const kdbx = useVaultStore((s) => s.kdbx);
+  const vaultVersion = useVaultStore((s) => s.vaultVersion);
+  return useMemo(() => {
+    if (!kdbx) return null;
+    const uuid = kdbx.meta.recycleBinUuid;
+    if (!uuid || uuid.empty) return null;
+    return uuid.id;
+  }, [kdbx, vaultVersion]);
+}
+
+/**
  * `true` se a entry indicada está dentro do grupo Lixeira do cofre. Usado
  * para desabilitar editar/deletar (Sessão 4 deixa Lixeira read-only;
  * gerenciar fica para Sessão 5).

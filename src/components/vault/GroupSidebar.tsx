@@ -4,13 +4,14 @@
 // aparece como primeiro item. Setas ↑/↓ navegam quando algum item está
 // focado; Enter/Espaço seleciona (comportamento padrão do <button>).
 
-import { Folder } from "lucide-react";
+import { Folder, Trash2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { confirmDialog } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
 import {
   getHasUnsavedChanges,
+  useRecycleBinUuidId,
   useTopLevelGroups,
   useVaultStore,
 } from "@/stores/vault";
@@ -19,6 +20,11 @@ export function GroupSidebar() {
   const groups = useTopLevelGroups();
   const selectedGroupUuid = useVaultStore((s) => s.selectedGroupUuid);
   const selectGroup = useVaultStore((s) => s.selectGroup);
+  // UUID da Lixeira (string) ou null. Usado pra trocar o ícone do grupo
+  // correspondente. Tradução do nome ("Recycle Bin" → "Lixeira") fica
+  // pra um pass futuro de i18n — por enquanto exibimos o nome que vem
+  // do header KDBX, que é o mesmo que o KeePassXC mostra.
+  const recycleBinUuidId = useRecycleBinUuidId();
 
   const containerRef = useRef<HTMLElement>(null);
 
@@ -83,6 +89,8 @@ export function GroupSidebar() {
     >
       {groups.map((g, idx) => {
         const selected = g.uuid.id === selectedGroupUuid;
+        const isRecycleBin = g.uuid.id === recycleBinUuidId;
+        const Icon = isRecycleBin ? Trash2 : Folder;
         return (
           <button
             key={g.uuid.id}
@@ -97,7 +105,12 @@ export function GroupSidebar() {
                 : "hover:bg-muted text-foreground",
             )}
           >
-            <Folder className="size-4 text-brand-tertiary shrink-0" />
+            <Icon
+              className={cn(
+                "size-4 shrink-0",
+                isRecycleBin ? "text-muted-foreground" : "text-brand-tertiary",
+              )}
+            />
             <span className="flex-1 truncate">{g.name || "(sem nome)"}</span>
             <span className="text-xs text-muted-foreground tabular-nums">
               {g.entries.length}

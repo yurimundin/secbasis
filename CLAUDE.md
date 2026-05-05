@@ -657,8 +657,11 @@ componentes de painel).
 | `Ctrl+L` | Bloquear cofre (volta para a `UnlockScreen`) |
 | `Ctrl+K` | Focar input de busca no header |
 | `Ctrl+C` | Copiar senha da entry selecionada com auto-clear (ignora se há texto selecionado ou foco em input) |
+| `Ctrl+E` | Entrar em modo edit na entry selecionada (em modo view, fora da Lixeira) |
+| `Ctrl+S` | Salvar (em modo edit/create — wire-up em [src/hooks/useCommitEdit.ts](src/hooks/useCommitEdit.ts)) |
+| `Delete` | Mover entry selecionada para a Lixeira (com confirmação). Ignorado se foco está em campo editável (input/textarea/contenteditable) |
 | `↑` / `↓` | Navegar grupos (sidebar focada) ou entradas (lista focada) |
-| `Esc` | Desfocar elemento atual |
+| `Esc` | Desfocar elemento atual (em modo view); cancelar edição com confirmação se dirty (em modo edit/create) |
 
 Auto-comportamentos:
 - **Auto-lock**: 5 min de inatividade (mousemove com throttle 250 ms,
@@ -1058,3 +1061,98 @@ disco em caso de erro de I/O:
   `entry.fields.clear()` + restaura entries do snapshot.
 - Modo `create`: `kdbx.createEntry(group)` é chamado antes do save;
   em erro, `group.entries.splice(idx, 1)` remove a entry órfã.
+
+---
+
+## 19. Delete e lixeira KDBX (Tarefa 7 da Sessão 4)
+
+### Soft-delete via `kdbx.move(entry, recycleBin)`
+
+Implementado em `moveEntryToRecycleBin` em [src/lib/kdbx.ts](src/lib/kdbx.ts).
+Não removemos a entry do `Kdbx` — movemos pro grupo Lixeira (RecycleBin).
+Razões:
+
+1. **Compatibilidade total com KeePass/KeePassXC.** Cofre alterado pelo
+   Sec.Basis abre no KeePassXC com a Lixeira no lugar certo, e vice-versa.
+   O `kdbx.move(...)` da kdbxweb cuida de `parentGroup`, `LocationChanged`
+   e demais campos de housekeeping esperados pelos outros leitores.
+2. **UX padrão do KeePass há décadas.** Usuário pode restaurar entrada
+   deletada por engano — funcionalidade esperada por quem migra de outros
+   gerenciadores.
+3. **MVP atual não precisa de hard-delete.** Restaurar/esvaziar a Lixeira
+   ficou pra Sessão 5+; enquanto isso, qualquer entrada na Lixeira pode
+   ser gerenciada via KeePassXC.
+
+### `RecycleBin` criado on-demand
+
+Se `meta.recycleBinUuid` está vazio quando o usuário deleta a primeira
+entry, chamamos `kdbx.createRecycleBin()` antes do `move`. Mesmo
+comportamento do KeePassXC. O grupo aparece automaticamente na sidebar na
+próxima invalidação de `vaultVersion`.
+
+### Persistência atômica reaproveitada
+
+`moveEntryToRecycleBin` chama `saveVault` internamente — mesma sequência
+da Tarefa 5 (backup `.bak` + magic check + `.tmp` + rename atômico, ver
+§17). Em falha de save, a entry FICA movida em memória mas o disco mantém
+o estado antigo. NÃO revertemos in-memory:
+
+- Recarregar do disco exigiria re-derivar chave / re-abrir cofre, custo
+  alto pra um caminho de erro raro.
+- O hook chamador (`useDeleteEntry`) NÃO incrementa `vaultVersion` em
+  falha, então a UI segue mostrando o estado pré-delete (consistência
+  visual).
+- Próximo `saveVault` bem-sucedido (qualquer mutação) vai persistir o
+  move junto. Consistência eventual aceitável pra MVP.
+
+### UI: botão Deletar + tecla Delete global
+
+[src/components/vault/EntryDetail.tsx](src/components/vault/EntryDetail.tsx)
+expõe ambos os caminhos:
+
+- **Botão Trash2** ao lado do botão Editar. Tooltip muda quando a entry
+  está na Lixeira (read-only no MVP).
+- **Tecla Delete** registrada no mesmo `useEffect` que cuida do Ctrl+E.
+  **Guard de foco em campo editável** (`tag === "INPUT" || "TEXTAREA"
+  || isContentEditable`) — sem isso, apertar Delete enquanto digita no
+  campo de busca do header iria deletar a entry selecionada. Cobre
+  também o cenário do Bloco G da validação (deletar em modo edit, foco
+  no form).
+
+Ambos os caminhos disparam `useDeleteEntry()` em
+[src/hooks/useDeleteEntry.ts](src/hooks/useDeleteEntry.ts), que abre o
+ConfirmDialog programático "Mover para a lixeira?" antes de qualquer
+mutação.
+
+### Entries dentro da Lixeira são read-only no MVP
+
+`useIsEntryInRecycleBin(entry)` (já existente da Sessão 3) desabilita
+ambos os botões Editar e Deletar quando `true`. Tooltip explicativo:
+"Esta entrada já está na Lixeira. No MVP atual, restaurar/esvaziar a
+lixeira é feito pelo KeePassXC."
+
+`useIsCurrentGroupRecycleBin()` (também da Sessão 3) desabilita o botão
+"+" da lista quando o grupo Lixeira está selecionado. Já estava
+implementado e segue válido.
+
+### Sidebar diferencia o grupo Lixeira
+
+Novo selector `useRecycleBinUuidId()` em [src/stores/vault.ts](src/stores/vault.ts)
+retorna a string-id do RecycleBin (ou `null` se não há). A
+`GroupSidebar` usa pra trocar o ícone Folder pelo Trash2 no item
+correspondente. Nome do grupo NÃO é traduzido — exibimos o que vem do
+header KDBX (geralmente "Recycle Bin"). Tradução pra "Lixeira" fica pra
+um pass futuro de i18n consistente.
+
+### Atalho Delete na seção §11
+
+| Atalho | Ação |
+|---|---|
+| `Delete` | Mover entry selecionada para a Lixeira (com confirmação). Ignorado se foco está em campo editável. |
+
+### TODO Sessão 5+
+
+- Restaurar entry da Lixeira (mover de volta pro grupo de origem ou raiz)
+- Esvaziar Lixeira (hard-delete via `DeletedObjects`)
+- Mover entry entre grupos manualmente
+- Drag-and-drop na sidebar/lista

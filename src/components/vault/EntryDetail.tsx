@@ -21,6 +21,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useDeleteEntry } from "@/hooks/useDeleteEntry";
 import { copyToClipboardWithAutoClear } from "@/lib/clipboard";
 import {
   formatRelative,
@@ -46,6 +47,7 @@ export function EntryDetail() {
   const entry = useCurrentEntry();
   const enterEditMode = useVaultStore((s) => s.enterEditMode);
   const inRecycleBin = useIsEntryInRecycleBin(entry);
+  const deleteEntry = useDeleteEntry();
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -66,23 +68,45 @@ export function EntryDetail() {
 
   const password = useMemo(() => (entry ? getPassword(entry) : ""), [entry]);
 
-  // Atalho Ctrl+E: em modo view com entry selecionada (e não na lixeira),
-  // entra em edit. Hook fica antes do early return pra cumprir as Rules
-  // of Hooks; condições internas garantem no-op fora do contexto certo.
+  // Atalhos globais do detail (em modo view):
+  // - Ctrl+E: entra em edit (entry não-lixeira selecionada).
+  // - Delete: dispara o flow de mover-pra-lixeira (entry não-lixeira
+  //   selecionada). NÃO dispara se foco está em campo editável (input,
+  //   textarea, contenteditable) — usuário pode estar digitando no
+  //   campo de busca do header.
+  // Hooks ficam antes do early return pra cumprir Rules of Hooks;
+  // condições internas garantem no-op fora do contexto certo.
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (editMode !== "view") return;
+
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const inEditableField =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        target?.isContentEditable === true;
+
       const ctrl = e.ctrlKey || e.metaKey;
+
       if (ctrl && e.key.toLowerCase() === "e") {
         if (entry && !inRecycleBin) {
           e.preventDefault();
           enterEditMode(entry.uuid.id);
         }
+        return;
+      }
+
+      if (e.key === "Delete" && !inEditableField) {
+        if (entry && !inRecycleBin) {
+          e.preventDefault();
+          void deleteEntry(entry);
+        }
       }
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [editMode, entry, inRecycleBin, enterEditMode]);
+  }, [editMode, entry, inRecycleBin, enterEditMode, deleteEntry]);
 
   // Switch para o editor — toda a lógica de edit/create vive lá.
   if (editMode !== "view") {
@@ -107,8 +131,12 @@ export function EntryDetail() {
   const groupName = entry.parentGroup?.name ?? "";
   const updatedLabel = formatRelative(getLastModTime(entry));
 
-  const editDisabledTooltip = inRecycleBin
-    ? "Restaure ou esvazie a lixeira para gerenciar esta entrada"
+  // Tooltip dos botões Editar/Deletar quando a entry está na lixeira.
+  // No MVP, gerenciar a lixeira (restaurar / esvaziar / editar item
+  // dentro dela) é responsabilidade do KeePassXC — informar isso no
+  // tooltip evita o usuário se perder.
+  const trashDisabledTooltip = inRecycleBin
+    ? "Esta entrada já está na Lixeira. No MVP atual, restaurar/esvaziar a lixeira é feito pelo KeePassXC."
     : undefined;
 
   async function handleOpenUrl() {
@@ -126,8 +154,8 @@ export function EntryDetail() {
   }
 
   function handleDelete() {
-    // TODO Tarefa 7: abrir ConfirmDialog "Mover para a lixeira?".
-    console.warn("[EntryDetail] TODO Tarefa 7 — delete não conectado");
+    if (!entry || inRecycleBin) return;
+    void deleteEntry(entry);
   }
 
   return (
@@ -154,7 +182,7 @@ export function EntryDetail() {
             size="sm"
             onClick={handleEdit}
             disabled={inRecycleBin}
-            title={editDisabledTooltip ?? "Editar entrada"}
+            title={trashDisabledTooltip ?? "Editar entrada (Ctrl+E)"}
           >
             <Pencil />
             Editar
@@ -165,7 +193,7 @@ export function EntryDetail() {
             size="icon"
             onClick={handleDelete}
             disabled={inRecycleBin}
-            title={editDisabledTooltip ?? "Mover para a lixeira"}
+            title={trashDisabledTooltip ?? "Mover para a lixeira (Delete)"}
             className="text-destructive hover:text-destructive"
           >
             <Trash2 />

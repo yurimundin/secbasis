@@ -10,6 +10,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import * as kdbxweb from "kdbxweb";
 
+import type { Kdbx, KdbxEntry, KdbxGroup } from "kdbxweb";
+
 import { deriveArgon2Key, type Argon2Variant } from "./argon2";
 
 let initialized = false;
@@ -295,6 +297,99 @@ export async function saveVault(
     return { ok: true, durationMs };
   } catch (e) {
     return { ok: false, error: describeError(e) };
+  }
+}
+
+/** Resultado de `moveEntryToRecycleBin` — backend pode retornar duração ou erro. */
+export type DeleteResult =
+  | { ok: true; durationMs: number }
+  | { ok: false; error: string };
+
+/**
+ * Move uma entry para o grupo Lixeira (RecycleBin) do cofre. Soft-delete
+ * compatível com KeePass/KeePassXC — usa a API nativa `kdbx.move(...)` da
+ * kdbxweb, que atualiza `parentGroup`, `LocationChanged` e demais campos
+ * de housekeeping da forma esperada por outros leitores do formato.
+ *
+ * Soft-delete (não hard-delete) é a escolha porque:
+ *   1. Compatibilidade total com KeePass/KeePassXC: lixeira gerada/movida
+ *      no Sec.Basis aparece nos outros clientes do ecossistema.
+ *   2. UX padrão do KeePass há décadas — usuário pode restaurar entradas
+ *      deletadas por engano.
+ *   3. MVP atual não implementa restaurar/esvaziar (Sessão 5+); isso é OK
+ *      porque a entry continua acessível via KeePassXC enquanto o gerente
+ *      não estiver pronto.
+ *
+ * Se o cofre ainda não tem RecycleBin configurado (ou o UUID está vazio),
+ * cria via `kdbx.createRecycleBin()` — mesmo padrão do KeePassXC quando
+ * o usuário move algo pela primeira vez.
+ *
+ * Persistência: chama `saveVault` (escrita atômica + backup `.bak` +
+ * magic-check, ver §17 do CLAUDE.md). NÃO lança — sempre retorna
+ * `DeleteResult`.
+ *
+ * Trade-off em caso de erro de save: o `kdbx` em memória já tem a entry
+ * movida (a kdbxweb mutou in-place antes do save), mas o disco ainda
+ * tem a versão antiga. Por simplicidade, NÃO revertemos in-memory:
+ *
+ * - Recarregar do disco exigiria re-derivar chave / re-abrir cofre,
+ *   complexidade alta para um caminho de erro raro.
+ * - Próximo `saveVault` bem-sucedido vai persistir o move (consistência
+ *   eventual).
+ * - Hook chamador (`useDeleteEntry`) decide se incrementa
+ *   `vaultVersion` mesmo em erro (refletir UI) ou não.
+ */
+export async function moveEntryToRecycleBin(
+  filePath: string,
+  kdbx: Kdbx,
+  entry: KdbxEntry,
+): Promise<DeleteResult> {
+  if (!filePath || !kdbx || !entry) {
+    return { ok: false, error: "Estado inválido para mover entrada." };
+  }
+
+  try {
+    let recycleBin: KdbxGroup | undefined;
+    const existingUuid = kdbx.meta.recycleBinUuid;
+    if (existingUuid && !existingUuid.empty) {
+      recycleBin = kdbx.getGroup(existingUuid);
+    }
+
+    if (!recycleBin) {
+      // Cria grupo "Recycle Bin" e seta `meta.recycleBinUuid` em uma só
+      // chamada — comportamento idêntico ao KeePassXC quando o usuário
+      // move a primeira entry de um cofre que ainda não tem lixeira.
+      kdbx.createRecycleBin();
+      const newUuid = kdbx.meta.recycleBinUuid;
+      if (newUuid && !newUuid.empty) {
+        recycleBin = kdbx.getGroup(newUuid);
+      }
+      if (!recycleBin) {
+        return { ok: false, error: "Falha ao criar grupo Lixeira no cofre." };
+      }
+    }
+
+    // Defesa: se a entry já está dentro da lixeira, não fazer nada (e
+    // ainda assim reportar OK pra UI ficar consistente). Cenário não
+    // deveria acontecer porque o botão Deletar está disabled em entries
+    // da lixeira, mas vale defesa programática.
+    if (entry.parentGroup === recycleBin) {
+      return { ok: false, error: "Entrada já está na Lixeira." };
+    }
+
+    kdbx.move(entry, recycleBin);
+
+    const result = await saveVault(filePath, kdbx);
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+
+    return { ok: true, durationMs: result.durationMs };
+  } catch (e) {
+    return {
+      ok: false,
+      error: `Erro ao mover entrada: ${describeError(e)}`,
+    };
   }
 }
 
