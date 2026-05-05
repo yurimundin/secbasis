@@ -1674,3 +1674,73 @@ Se aparecer no Linux mas não no Windows, é definitivamente Linux-only.
 - **Alert #1 (Sessão 9):** `glib < 0.20.0` — `VariantStrIter::impl_get`
   unsoundness. Dispensado como "Risk tolerable — vulnerable code not
   compiled into Windows binary".
+
+## §26 — Smoke test do pipeline cripto (boot do app)
+
+**Contexto:** Sec.Basis valida no boot que o pipeline cripto (Argon2id
+nativo + kdbxweb round-trip) está funcional. Útil para detectar
+regressões em mudanças de toolchain (Rust upgrade, kdbxweb update,
+WebView2 atualização) e para benchmarks de performance.
+
+**Localização:**
+- Lógica: `src/lib/__tests__/kdbx-smoke.ts`
+- Disparador: `src/main.tsx` (dynamic import condicional)
+- Endpoint Rust: `log_smoke_result` em `src-tauri/src/lib.rs` (logger
+  genérico, reusável para outros benchmarks futuros)
+
+**Gating strategy:**
+
+```typescript
+// src/main.tsx
+const SHOULD_RUN_SMOKE =
+  import.meta.env.DEV || import.meta.env.VITE_RUN_SMOKE === "1";
+
+if (SHOULD_RUN_SMOKE) {
+  void import("./lib/__tests__/kdbx-smoke").then(({ runKdbxSmokeTest }) =>
+    runKdbxSmokeTest(),
+  );
+}
+```
+
+**Comportamento por modo de build:**
+
+| Modo | `import.meta.env.DEV` | `VITE_RUN_SMOKE` | Smoke roda? |
+|---|---|---|---|
+| `npm run tauri dev` | `true` | qualquer | ✅ sim |
+| `tauri build` (release default) | `false` | unset | ❌ não |
+| `tauri build` com `VITE_RUN_SMOKE=1` | `false` | `"1"` | ✅ sim (intencional, para benchmarks) |
+
+**Por que essa estratégia funciona:**
+
+1. **Dynamic import:** Vite faz tree-shaking real — em release default,
+   o arquivo `kdbx-smoke.ts` nem entra no bundle (chunk separado,
+   carregado apenas quando a condição é verdadeira).
+2. **DEV automático:** detecta ambiente de desenvolvimento sem requerer
+   variável de ambiente manual.
+3. **Override controlado:** `VITE_RUN_SMOKE=1` permite disparar em
+   release builds intencionalmente (ex: validar performance pós-build,
+   benchmarks comparativos).
+4. **Endpoint Rust separado:** `log_smoke_result` é genérico — não
+   contém lógica de teste, apenas roteia mensagens para `println!` +
+   arquivo de log. Pode ser reusado por outros benchmarks futuros sem
+   acoplar ao smoke test específico.
+
+**Senhas dummy:** o smoke test usa senhas placeholder (`test123`,
+`super-secret`, `benchmark-password`) que estão explicitamente marcadas
+no código como falsos positivos para scanners de credenciais. Não
+substituir por senhas "fortes" — o objetivo é justamente serem
+identificáveis como dummy.
+
+**Output em log:** mesmo em DEV, o `log_smoke_result` escreve em
+`%TEMP%/sec-basis-bench.log` (silencioso se falhar). Esse arquivo
+preserva histórico de benchmarks entre execuções, útil para analisar
+regressões de performance ao longo do tempo.
+
+**Decisão arquitetural:** smoke test não é pollutant — é instrumento.
+Não remover. Não tornar mais restritivo (já está bem gated). Documentar
+para futuros contributors entenderem o design.
+
+**Lição operacional:** Sessão 9 inicialmente marcou smoke test como
+"TODO de cleanup" sem investigar o código. Sessão 10 investigou e
+descobriu que arquitetura era sólida. Princípio: antes de marcar
+algo como dívida técnica, investigar se realmente é problema.
