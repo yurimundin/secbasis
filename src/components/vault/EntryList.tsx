@@ -6,10 +6,11 @@
 // (username || URL || ""). Setas ↑/↓ navegam quando algum item está
 // focado.
 
-import { Plus } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useEmptyRecycleBin } from "@/hooks/useEmptyRecycleBin";
 import { confirmDialog } from "@/lib/confirm";
 import {
   getAvatarColorClass,
@@ -34,6 +35,8 @@ export function EntryList() {
   const enterCreateMode = useVaultStore((s) => s.enterCreateMode);
   const exitToViewMode = useVaultStore((s) => s.exitToViewMode);
   const isRecycleBin = useIsCurrentGroupRecycleBin();
+  const emptyRecycleBin = useEmptyRecycleBin();
+  const [emptying, setEmptying] = useState(false);
 
   const sorted = useMemo(() => {
     return [...entries].sort((a, b) =>
@@ -104,30 +107,59 @@ export function EntryList() {
     enterCreateMode(selectedGroupUuid);
   }
 
+  // Esvaziar Lixeira: hard-delete em massa. Hook trata confirmDialog
+  // (com lembrete de backup), persistência e toasts. `emptying` evita
+  // double-click disparar dois saves em paralelo.
+  async function handleEmptyRecycleBin() {
+    if (emptying) return;
+    setEmptying(true);
+    try {
+      await emptyRecycleBin(sorted.length);
+    } finally {
+      setEmptying(false);
+    }
+  }
+
   return (
     <section
       ref={containerRef}
       className="border-r border-border flex flex-col overflow-hidden"
     >
-      {/* Cabeçalho da lista — sempre visível mesmo quando vazio. */}
+      {/* Cabeçalho da lista — sempre visível mesmo quando vazio.
+          Em grupo normal: botão "+" para criar nova entrada.
+          Em Lixeira COM entries: botão "Esvaziar" (destructive).
+          Em Lixeira VAZIA: nenhum botão (padrão Gmail). */}
       <header className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-border bg-bg-secondary">
         <span className="text-xs font-medium text-muted-foreground tabular-nums">
           {sorted.length} {sorted.length === 1 ? "entrada" : "entradas"}
         </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={handleCreate}
-          disabled={!selectedGroupUuid || isRecycleBin}
-          title={
-            isRecycleBin
-              ? "Não é possível criar entradas dentro da lixeira"
-              : "Nova entrada"
-          }
-        >
-          <Plus />
-        </Button>
+        {isRecycleBin ? (
+          sorted.length > 0 ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => void handleEmptyRecycleBin()}
+              disabled={emptying}
+              title="Apagar permanentemente todas as entradas da Lixeira"
+              aria-label="Esvaziar Lixeira"
+            >
+              <Trash2 />
+              {emptying ? "Esvaziando..." : "Esvaziar"}
+            </Button>
+          ) : null
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleCreate}
+            disabled={!selectedGroupUuid}
+            title="Nova entrada"
+          >
+            <Plus />
+          </Button>
+        )}
       </header>
 
       {sorted.length === 0 ? (

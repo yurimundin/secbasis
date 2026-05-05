@@ -1265,3 +1265,88 @@ Como usa `kdbx.move(entry, root)` da kdbxweb (mesma API que KeePassXC
 usa internamente), entries restauradas no Sec.Basis aparecem
 corretamente no grupo raiz quando o cofre é aberto no KeePassXC, e
 vice-versa. Validado fim-a-fim na validação manual da Tarefa 1.
+
+---
+
+## 21. Esvaziar Lixeira (Tarefa 2 da Sessão 5)
+
+### `emptyRecycleBin` em `kdbx.ts`
+
+Implementado em `src/lib/kdbx.ts`. Itera `kdbx.move(entry, undefined)`
+em todas as entries do grupo Lixeira (RecycleBin). Esse é o uso correto
+da API kdbxweb para hard-delete — `move(entry, undefined)` chama
+`addDeletedObject()` automaticamente, populando `meta.deletedObjects`
+com tombstone. A entry deixa de aparecer em qualquer grupo, mas o
+tombstone permanece no formato (lista interna do KDBX usada para
+reconciliação em cenários de sync entre múltiplos cofres). É o que
+outros leitores do ecossistema KeePass esperam.
+
+**Gotcha importante (custou a primeira tentativa da Tarefa 2):**
+`kdbx.remove(entry)` NÃO é hard-delete quando
+`meta.recycleBinEnabled === true` (default em todo cofre KDBX novo).
+JSDoc literal da kdbxweb: *"Depending on settings, removes either to
+trash, or completely"*. Em cofre com Lixeira habilitada, `remove()` é
+sinônimo de `move(entry, recycleBin)` — se a entry já está na Lixeira,
+o `move()` interno splica do `recycleBin.entries` e dá push de volta
+no fim do mesmo array, sem tocar em `deletedObjects`. Save persiste
+cofre idêntico ao anterior. Toast diz "esvaziada" e o usuário não
+percebe o no-op até reabrir o cofre.
+
+**Ponto técnico crítico:** snapshot do array (`[...recycleBin.entries]`)
+ANTES de iterar. `kdbx.move` muta `recycleBin.entries` in-place; iterar
+diretamente faria skip de elementos.
+
+Validações defensivas:
+1. `kdbx.meta.recycleBinUuid` existe e não está vazio.
+2. `kdbx.getGroup(recycleBinUuid)` retorna o grupo Lixeira.
+3. `recycleBin.entries.length > 0` (não persistir save no-op).
+
+Persistência via `saveVault` (escrita atômica + backup `.bak`, ver §17).
+Trade-off de erro de save igual a `moveEntryToRecycleBin` /
+`restoreEntryFromRecycleBin`: kdbx mutado em memória, próximo save
+persiste junto. TODO Sessão 6+: rollback in-memory.
+
+### Hook `useEmptyRecycleBin`
+
+[src/hooks/useEmptyRecycleBin.ts](src/hooks/useEmptyRecycleBin.ts) —
+recebe `entryCount: number` como argumento (não re-deriva via selectors;
+componente chamador já tem o número). `confirmDialog` OBRIGATÓRIO com:
+
+- Título dinâmico: `Apagar permanentemente N entradas?` (com
+  pluralização: `1 entrada` / `N entradas`)
+- Descrição: lembra que **Sec.Basis não consegue desfazer** e sugere
+  cópia externa do `.kdbx` antes de continuar
+- `confirmLabel: "Apagar permanentemente"`, `variant: "danger"` (botão
+  vermelho)
+
+Em sucesso: incrementa `vaultVersion`, limpa seleção (entries
+removidas não existem mais), toast verde
+`Lixeira esvaziada (N entradas, Yms)` (também com pluralização).
+
+### UI no `EntryList`
+
+Header da lista renderiza condicionalmente:
+
+| Estado do grupo | Botão renderizado |
+|---|---|
+| Grupo normal | `+` (criar entry) — comportamento original |
+| Lixeira COM entries | `Esvaziar` (variant destructive, ícone Trash2) |
+| Lixeira VAZIA | nenhum botão — padrão Gmail |
+
+Esconder o botão quando vazio (em vez de desabilitar) é decisão de UX
+deliberada — botão desabilitado em estado "natural" (Lixeira vazia é
+o ideal) é ruído visual desnecessário.
+
+Estado local `emptying: boolean` evita double-click — botão fica
+disabled com label "Esvaziando..." durante o I/O.
+
+### Atalhos de teclado
+
+**Sem atalho.** Esvaziar é ação rara + irreversível — atalho
+aumentaria risco de invocação acidental sem benefício prático.
+
+### Navegação após esvaziar
+
+`selectEntry(null)` no sucesso. O `EntryList` mostra estado vazio
+("(sem entradas neste grupo)"). Sidebar continua exibindo o grupo
+Lixeira — não desaparece, comportamento idêntico ao KeePassXC.

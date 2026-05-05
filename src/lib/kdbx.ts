@@ -466,6 +466,97 @@ export async function restoreEntryFromRecycleBin(
   }
 }
 
+/** Resultado de `emptyRecycleBin` — duração + contagem ou erro. */
+export type EmptyRecycleBinResult =
+  | { ok: true; durationMs: number; entriesDeleted: number }
+  | { ok: false; error: string };
+
+/**
+ * Apaga permanentemente todas as entries do grupo Lixeira (RecycleBin)
+ * — hard-delete, sem possibilidade de restauração pelo Sec.Basis.
+ *
+ * Mecânica: itera `kdbx.move(entry, undefined)` em cada entry da
+ * Lixeira (ver detalhe da escolha da API logo abaixo, dentro da função).
+ * Cada `move(..., undefined)` chama `addDeletedObject()` da kdbxweb
+ * automaticamente, populando `meta.deletedObjects` (lista interna do
+ * KDBX usada para reconciliação em cenários de sincronização entre
+ * múltiplos cofres) com o tombstone da entry. A entry deixa de aparecer
+ * em qualquer grupo, mas o tombstone permanece no formato — é o
+ * comportamento padrão do KeePass e é o que outros leitores esperam.
+ *
+ * Snapshot do array antes de iterar é OBRIGATÓRIO porque `kdbx.move`
+ * muta `recycleBin.entries` in-place; iterar diretamente faria skip de
+ * elementos.
+ *
+ * Persistência: chama `saveVault` (escrita atômica + backup `.bak` +
+ * magic-check, ver §17 do CLAUDE.md). NÃO lança — sempre retorna
+ * `EmptyRecycleBinResult`.
+ *
+ * Trade-off em caso de erro de save: o `kdbx` em memória já teve as
+ * entries removidas; o disco mantém o estado antigo. Mesmo padrão de
+ * `moveEntryToRecycleBin` e `restoreEntryFromRecycleBin`. TODO Sessão
+ * 6+: rollback in-memory.
+ */
+export async function emptyRecycleBin(
+  filePath: string,
+  kdbx: Kdbx,
+): Promise<EmptyRecycleBinResult> {
+  if (!filePath || !kdbx) {
+    return { ok: false, error: "Estado inválido para esvaziar Lixeira." };
+  }
+
+  try {
+    const recycleBinUuid = kdbx.meta.recycleBinUuid;
+    if (!recycleBinUuid || recycleBinUuid.empty) {
+      return { ok: false, error: "Cofre não tem Lixeira configurada." };
+    }
+    const recycleBin = kdbx.getGroup(recycleBinUuid);
+    if (!recycleBin) {
+      return { ok: false, error: "Grupo Lixeira não encontrado no cofre." };
+    }
+
+    // Snapshot ANTES de iterar — kdbx.remove muta o array in-place.
+    const entriesToRemove = [...recycleBin.entries];
+    const count = entriesToRemove.length;
+
+    if (count === 0) {
+      return { ok: false, error: "Lixeira já está vazia." };
+    }
+
+    // Hard-delete de cada entry.
+    // kdbx.move(entry, undefined) é a API correta de hard-delete na
+    // kdbxweb: quando toGroup é undefined, kdbx.move() chama
+    // addDeletedObject() automaticamente, populando meta.deletedObjects
+    // com tombstone.
+    //
+    // IMPORTANTE: kdbx.remove() NÃO é hard-delete quando
+    // recycleBinEnabled. JSDoc da kdbxweb: "Depending on settings,
+    // removes either to trash, or completely". Como o default é
+    // recycleBinEnabled=true, remove() move para a Lixeira. Quando
+    // entry JÁ está na Lixeira, vira no-op (splice + push no mesmo
+    // array). Ver §21 do CLAUDE.md.
+    for (const entry of entriesToRemove) {
+      kdbx.move(entry, undefined);
+    }
+
+    const result = await saveVault(filePath, kdbx);
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+
+    return {
+      ok: true,
+      durationMs: result.durationMs,
+      entriesDeleted: count,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: `Erro ao esvaziar Lixeira: ${describeError(e)}`,
+    };
+  }
+}
+
 // ----- Helpers internos de I/O e erro ---------------------------------------
 
 async function readFileBytes(filePath: string): Promise<Uint8Array> {
