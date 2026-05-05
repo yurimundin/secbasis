@@ -31,6 +31,8 @@ import {
   type EntryDraft,
 } from "@/stores/vault";
 
+import { PasswordGenerator } from "./PasswordGenerator";
+
 interface FieldConfig {
   key: keyof EntryDraft;
   label: string;
@@ -115,11 +117,6 @@ export function EntryEditor() {
     }
     // TODO Tarefa 6: chamar `useCommitEdit()` aqui. Por enquanto só log.
     console.warn("[EntryEditor] TODO Tarefa 6 — commitEdit não conectado");
-  }
-
-  function handleGeneratePasswordPlaceholder() {
-    // TODO Tarefa 4: abrir popover do gerador de senhas.
-    console.warn("[EntryEditor] TODO Tarefa 4 — gerador de senhas");
   }
 
   return (
@@ -224,16 +221,20 @@ export function EntryEditor() {
               >
                 {showPassword ? <EyeOff /> : <Eye />}
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleGeneratePasswordPlaceholder}
-                title="Gerar senha (em breve)"
-                tabIndex={-1}
-              >
-                <Sparkles />
-              </Button>
+              <PasswordGenerator
+                onUse={(pwd) => updateDraft("password", pwd)}
+                trigger={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Gerar senha"
+                    tabIndex={-1}
+                  >
+                    <Sparkles />
+                  </Button>
+                }
+              />
               <Button
                 type="button"
                 variant="ghost"
