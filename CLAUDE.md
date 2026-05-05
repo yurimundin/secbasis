@@ -1628,3 +1628,49 @@ quando há um Kdbx ativo.
 - "Esquecer este cofre" sem ter que abrir e clicar voltar
 - Persistir auto-lock state entre boots (intencionalmente NÃO — o
   auto-lock é um evento de sessão, não estado durável)
+
+## §25 — Vulnerabilidades transitivas Linux-only (Sessão 9)
+
+**Contexto:** Dependabot pode reportar vulnerabilidades em crates Rust
+que são dependências transitivas do `tauri-runtime-wry` mas que
+**só são compiladas em build Linux**. Sec.Basis hoje só faz build para
+Windows (target `x86_64-pc-windows-msvc`), usando WebView2.
+
+**Crates afetadas (Linux-only):**
+- `glib`, `glib-sys`, `glib-macros`
+- `gtk`, `gdk`, `gdk-pixbuf`, `gdkx11`, `atk`, `pango`, `cairo-rs`
+- `webkit2gtk`, `javascriptcore-rs`, `soup3`
+- `tao` (apenas no path GTK)
+
+**Como verificar se uma vulnerability é Linux-only:**
+
+```bash
+cd src-tauri
+cargo tree --target x86_64-pc-windows-msvc | grep -i <crate-name>
+```
+
+Se retornar vazio, a crate não está no binário Windows e o alerta
+pode ser dispensado como "Risk tolerable" no GitHub Dependabot.
+
+**Comparar com Linux para confirmar:**
+
+```bash
+cargo tree --target x86_64-unknown-linux-gnu | grep -i <crate-name>
+```
+
+Se aparecer no Linux mas não no Windows, é definitivamente Linux-only.
+
+**Decisão de processo:**
+
+- Vulnerabilidades em crates Linux-only podem ser dispensadas no
+  Dependabot com comentário citando a análise via `cargo tree --target`
+- Quando suporte Linux for adicionado (Roadmap Fase 1/2), TODAS essas
+  dispensas precisam ser revisitadas
+- Mantém mitigation registrada em commit message + dismiss reason no
+  GitHub para auditabilidade
+
+**Histórico:**
+
+- **Alert #1 (Sessão 9):** `glib < 0.20.0` — `VariantStrIter::impl_get`
+  unsoundness. Dispensado como "Risk tolerable — vulnerable code not
+  compiled into Windows binary".
