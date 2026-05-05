@@ -28,8 +28,18 @@ O **Sec.Basis** preenche essa lacuna com:
 
 ## Status
 
-🚧 **Em desenvolvimento ativo.** Ainda não há build de produção. A primeira
-versão pública (MVP) será publicada na Microsoft Store após estabilização.
+🚧 **Em desenvolvimento ativo.** O MVP funcional está implementado
+(CRUD completo, gerador de senhas, persistência atômica com backup,
+soft-delete via Recycle Bin compatível com KeePass). Ainda não há
+release público — primeira versão alpha será publicada quando os
+itens marcados como 🚧 no roadmap estiverem concluídos.
+
+## Site oficial
+
+🌐 [sec.basis.app.br](https://sec.basis.app.br/)
+
+Documentação de usuário, downloads (em breve) e conteúdo institucional
+ficam no site. Este repositório é o código-fonte e documentação técnica.
 
 ## Stack
 
@@ -75,16 +85,34 @@ Princípios de design que guiam o projeto:
   senha é limpo após poucos segundos.
 - **Backup automático antes de salvar.** Arquivo atual vira `.kdbx.bak`.
 
-## Roadmap (resumo)
+## Roadmap
 
-- **Fase 1 (MVP):** abrir/criar cofre, CRUD de entradas, gerador de senhas,
-  auto-lock, auto-clear, busca, empacotamento Windows.
-- **Fase 2:** key file, YubiKey, TOTP, anexos, importação Bitwarden/1Password,
+- **Fase 1 (MVP):**
+  - ✅ Abrir/criar cofre KDBX4
+  - ✅ Suporte a key file
+  - ✅ CRUD completo de entradas
+  - ✅ Gerador criptográfico de senhas
+  - ✅ Auto-lock e auto-clear de clipboard
+  - ✅ Persistência atômica com backup `.kdbx.bak`
+  - ✅ Soft-delete via Recycle Bin (compatível com KeePass)
+  - 🚧 Busca em tempo real
+  - 🚧 Subgrupos expansíveis na sidebar
+  - 🚧 Restaurar/esvaziar Lixeira
+  - 🚧 Empacotamento Windows (Microsoft Store)
+
+- **Fase 2:** YubiKey, TOTP, anexos, importação Bitwarden/1Password/LastPass,
   auditoria de senhas.
-- **Fase 3:** extensão de browser para auto-fill, modo equipe via pasta
+
+- **Fase 3:** Extensão de browser para auto-fill, modo equipe via pasta
   sincronizada, painel de saúde do cofre (LGPD-friendly).
 
 Detalhes em [`CLAUDE.md`](CLAUDE.md).
+
+## Sobre a marca
+
+**Sec.Basis** pertence à família de produtos sob o domínio `basis.app.br`.
+Outros produtos da família estão em planejamento; o foco atual é estabilizar
+o Sec.Basis primeiro.
 
 ## Contribuindo
 

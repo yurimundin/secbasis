@@ -767,11 +767,22 @@ arquivos individuais em `src-tauri/icons/` à mão.
 
 Repositório público: <https://github.com/yurimundin/secbasis>
 
-| Hash | Tipo | Mensagem |
+| Hash | Tipo | Descrição |
 |---|---|---|
-| `8de660f` | chore | initial scaffolding — tauri v2 + react + tailwind + kdbxweb |
-| `995428a` | feat | argon2, key file support, vault layout and security tooling |
+| `2282553` | docs | fix broken clone instructions in README |
+| `954e330` | feat | soft-delete entries via KDBX recycle bin (Tarefa 7) |
+| `dafbb53` | feat | wire commitEdit to Save button with dirty-state guards (Tarefa 6) |
+| `9450100` | feat | atomic save with backup for existing vault files (Tarefa 5) |
+| `129d8be` | feat | cryptographic password generator with popover UI (Tarefa 4) |
+| `124e065` | feat | entry editor with edit/create modes and confirmation dialog (T1-3) |
+| `92097a1` | fix | prevent infinite loop in vault selectors and broken grid layout |
+| `ad2e926` | revert | temporarily remove security.txt reference until file is uploaded |
+| `16afd0a` | security | replace email placeholder and reference security.txt |
+| `837f281` | security | replace email placeholder with security@basis.app.br |
+| `5464c01` | docs | reference commits and milestones in CLAUDE.md |
 | `e5a3c02` | chore | add app icon, security policy and contribution guide |
+| `995428a` | feat | argon2, key file support, vault layout and security tooling |
+| `8de660f` | chore | initial scaffolding — tauri v2 + react + tailwind + kdbxweb |
 
 Política de histórico: **NUNCA reescrever** (rebase/squash/force-push) o
 ramo `main`. Se um commit precisar ser corrigido, criar um novo commit
@@ -786,10 +797,28 @@ de correção.
   atalhos, key file com memória por cofre, banner informativo)
 - ✅ Sessão 3 adendo: ícone definitivo + arquivos meta (SECURITY,
   CONTRIBUTING, .gitattributes) + 3 commits no GitHub público
+- ✅ **Sessão 3.5** (`837f281`): e-mail oficial de segurança configurado
+  em `security@basis.app.br`
+- ✅ **Sessão 3.6** (`ad2e926`): referência ao security.txt removida
+  temporariamente (arquivo não está hospedado)
+- ✅ **Sessão 4 — MVP funcional do CRUD completo:**
+  - Tarefas 1-3 (`124e065`): editor de entradas com modo view/edit/create
+    + confirm dialog
+  - Bug fix (`92097a1`): loop infinito em vault selectors + grid layout
+    do Tailwind 4
+  - Tarefa 4 (`129d8be`): gerador criptográfico de senhas em popover
+  - Tarefa 5 (`9450100`): save atômico com backup `.kdbx.bak` (validado
+    fim-a-fim com KeePassXC)
+  - Tarefa 6 (`dafbb53`): wire-up do save no botão Salvar + dirty guards
+    em 4 cenários
+  - Tarefa 7 (`954e330`): soft-delete via Recycle Bin compatível com
+    KeePassXC
+- ✅ **Sessão 4.5 Bloco 1** (`2282553`): correção de instruções de clone
+  no README
 
-**Próximo:** Sessão 4 — CRUD de entradas (criar/editar/remover), busca
-real (placeholder do Ctrl+K já existe), gerador de senhas standalone,
-e drag-and-drop entre grupos.
+**Próximo:** Sessão 5 — busca em tempo real, subgrupos expansíveis na
+sidebar, restaurar/esvaziar Lixeira, e início do polimento de UX/UI
+dedicado.
 
 ---
 

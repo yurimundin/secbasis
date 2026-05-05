@@ -19,7 +19,10 @@ Veja o [README.md](./README.md) para instruções completas.
 - Comentários em português brasileiro.
 - Código (variáveis, funções, arquivos) em inglês.
 - UI em português brasileiro (i18n no futuro).
-- Tailwind CSS via tokens da paleta Sec.Basis (não usar arbitrary values).
+- Tailwind CSS: prefira tokens da paleta Sec.Basis. Arbitrary values
+  (ex: `max-w-[440px]`) são aceitos quando o token não cobre o caso.
+  Para layouts críticos (grid, flex), considerar inline `style={{ ... }}`
+  por determinismo — ver CLAUDE.md §12 sobre o bug do scanner do Tailwind 4.
 - Sem dependências novas sem justificativa em PR.
 
 ## Convenções de commits
