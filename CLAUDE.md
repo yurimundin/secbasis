@@ -769,6 +769,9 @@ Repositório público: <https://github.com/yurimundin/secbasis>
 
 | Hash | Tipo | Descrição |
 |---|---|---|
+| `2575be6` | docs | document devDependency vulnerability process (CLAUDE.md §30) (S14) |
+| `a61cb31` | chore | add basic CI workflow (GitHub Actions with tsc + cargo check) (S13) |
+| `3831767` | docs | document Dependabot stale PR lesson (CLAUDE.md §28) (S12) |
 | `48d084e` | feat | expandable subgroups in sidebar with persistent state (S11) |
 | `7d7ba75` | docs | align CLAUDE.md §14 and README with project state through Session 10 (S10.5) |
 | `d2cc329` | docs | document smoke test gating strategy (CLAUDE.md §26) (S10 Tarefa C) |
@@ -918,12 +921,43 @@ de correção.
   - Keyboard nav recursiva: setas ↑↓ navegam visíveis, → expande,
     ← colapsa ou sobe pro pai (estilo VS Code Explorer).
   - Documentação em §27.
+- ✅ **Sessão 12 — PR stale do Dependabot + lição §28** (`3831767`):
+  - Investigação revelou que PR `dev-dependencies-2f25c8d3ab` estava
+    baseado em commit `caffd14` (Sessão 4.5), 15 commits behind main.
+  - Mergear via "Squash and merge" do GitHub UI teria silenciosamente
+    deletado ~25 arquivos das Sessões 5-11.
+  - PR fechado no GitHub para Dependabot reabrir em base limpa.
+  - §28 documenta processo de verificação de PRs stale + decisão de
+    "fechar PR stale" como caminho padrão.
+- ✅ **Sessão 13 — CI básico GitHub Actions** (`a61cb31`):
+  - `.github/workflows/ci.yml` com 2 jobs paralelos: TypeScript
+    (`tsc --noEmit`) e Rust (`cargo check --all-targets`).
+  - Trigger: push em `main` + pull_request em `main`.
+  - Ubuntu runner com Linux deps de Tauri (`libwebkit2gtk-4.1-dev`,
+    `libayatana-appindicator3-dev`, `librsvg2-dev`, `libxdo-dev`,
+    `libssl-dev`, `patchelf`).
+  - Cache: npm built-in via `setup-node` + cargo via
+    `Swatinem/rust-cache@v2`.
+  - Branch protection NÃO ativada inicialmente (validar 1-2 semanas
+    primeiro, depois ativar).
+  - Documentação em §29.
+- ✅ **Sessão 14 — DevDep vulnerability + lição §30** (`2575be6`):
+  - Erro do Dependabot npm job investigado: GHSA em
+    `ip-address < 10.1.1` (XSS em `Address6.group/link/parseMessage`).
+  - Cadeia: `shadcn` (devDep) → `express-rate-limit` → `ip-address`.
+  - Vulnerability não é alcançável em runtime do Sec.Basis (devDep,
+    CLI scaffolding, código vulnerável é dead code per upstream).
+  - Alerta dispensado no GitHub como "Risk tolerable".
+  - §30 estabelece framework de 4 critérios para avaliação de
+    vulnerabilidades em devDependencies — distinto do critério §25
+    (Linux-only, target de build) por ser fase de ciclo de vida (dev).
 
-**Próximo:** Sessão 12 — busca em tempo real ou empacotamento Windows
+**Próximo:** Sessão 16 — busca em tempo real ou empacotamento Windows
 (itens 🚧 do Roadmap Fase 1). Outras pendências: rollback in-memory
-em erros de save, code-splitting, CI básico (GitHub Actions), major
-upgrades de deps (vite 7→8, typescript 5→6), PR aberto do Dependabot
-em branch `dev-dependencies-2f25c8d3ab`.
+em erros de save, code-splitting, major upgrades de deps (vite 7→8,
+typescript 5→6, @vitejs/plugin-react 4→6 — sessão dedicada). Validação
+diferida: ativar branch protection com CI obrigatório após 1-2 semanas
+de funcionamento estável (decisão da Sessão 13).
 
 ---
 
