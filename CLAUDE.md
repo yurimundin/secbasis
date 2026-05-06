@@ -1991,3 +1991,66 @@ Branch protection rules → Require status checks to pass.
 **Lição:** CI básico desde alpha protege qualidade sem custo de
 desenvolvimento. Não over-engineer com smoke tests headless ou audits
 preventivamente — adicionar quando dor real for identificada.
+
+---
+
+## 30. Vulnerabilidades em devDependencies (Sessão 14)
+
+**Contexto:** Dependabot reporta vulnerabilidades também em
+devDependencies (ferramentas de build, CLI tools, scaffolding) e em
+suas transitivas. Para devDependencies que não executam no runtime do
+app e não vão para o binário entregue ao usuário, o impacto real para
+end-users é tipicamente zero.
+
+Esse padrão é **conceitualmente distinto** da §25 (vulnerabilidades
+Linux-only): ali o critério é arquitetura de target (Windows-only
+binary não inclui código Linux); aqui o critério é fase do ciclo de
+vida (devDep nunca compila no bundle de produção).
+
+**Critério de avaliação:**
+
+Antes de dispensar, validar todas as condições:
+
+1. **A dep está em devDependencies?** Verificar `package.json` (não
+   `dependencies`).
+2. **A dep tem caminho de execução no app?** Buscar imports/requires:
+   `grep -r "from.*<package>" src/ src-tauri/`. Esperado: zero matches.
+3. **O código vulnerável é alcançável?** Ler advisory upstream — alguns
+   advisories declaram explicitamente que código vulnerável é dead code
+   (ex: GHSA do ip-address: "zero consumers across 425 dependent npm
+   packages").
+4. **A dep entra no bundle de produção?** Para Tauri+Vite, validar que
+   a dep não é importada por código que vai para `dist/`. devDeps
+   típicas (CLI scaffolding, linters, type-checkers, test runners)
+   não entram.
+
+Se todas as 4 condições indicam "não exposto", dispensar como
+"Risk tolerable" no GitHub UI com justificativa documentada referenciando
+esta seção.
+
+**Diferença prática para §25:**
+
+| Critério | §25 (Linux-only) | §30 (devDep não-runtime) |
+|---|---|---|
+| Tipo de exclusão | Build target (Windows) | Fase de ciclo (dev) |
+| Comando de validação | `cargo tree --target ...` | `grep -r imports + package.json` |
+| Risco residual | Código transitivo nunca compilado | Código nunca executado |
+| Auto-resolução | Quando upstream patch | Quando devDep upstream atualiza |
+
+**Histórico:**
+
+- **Alerta dispensado (Sessão 14):** GHSA em `ip-address < 10.1.1`
+  (XSS em `Address6.group/link/parseMessage`). Cadeia:
+  `shadcn@4.7.0` (devDep) → `express-rate-limit@8.5.0` →
+  `ip-address@10.1.0`. Sec.Basis não importa `ip-address` em runtime;
+  shadcn é CLI tool de scaffolding executada apenas durante
+  desenvolvimento. Upstream advisory documenta zero consumers dos
+  métodos vulneráveis. Dispensado como "Risk tolerable — vulnerable
+  code not reachable from Sec.Basis runtime, devDep does not ship in
+  binary".
+
+**Lição operacional:** Dependabot updates job pode falhar quando uma
+vulnerability transitiva não tem patch disponível na versão fixada por
+um pacote pai. Esse erro **não bloqueia** desenvolvimento — apenas
+indica que Dependabot não consegue propor PR de fix. Auto-resolve
+quando o pacote pai atualiza sua dep direta.
