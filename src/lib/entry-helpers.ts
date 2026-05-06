@@ -4,7 +4,7 @@
 // realmente vai ser exibida/copiada).
 
 import * as kdbxweb from "kdbxweb";
-import type { KdbxEntry } from "kdbxweb";
+import type { KdbxEntry, KdbxGroup } from "kdbxweb";
 
 const { ProtectedValue } = kdbxweb;
 
@@ -95,4 +95,98 @@ export function getAvatarColorClass(text: string): string {
     hash |= 0;
   }
   return palette[Math.abs(hash) % palette.length];
+}
+
+/**
+ * Retorna o caminho do grupo de uma entry como string formatada.
+ * Walk-up via `parentGroup`, traduz Lixeira (i18n consistente com
+ * `getGroupDisplayName` em `vault.ts`).
+ *
+ * Não importa `getGroupDisplayName` direto para evitar ciclo
+ * `entry-helpers.ts ↔ vault.ts` (vault.ts já importa helpers daqui).
+ * A regra de tradução é uma única linha — duplicação aceitável.
+ *
+ * @example "Pessoal / Bancos"
+ * @example "Cofre / Trabalho / Email"
+ */
+export function getGroupPath(
+  entry: KdbxEntry,
+  recycleBinUuidId: string | null,
+): string {
+  const path: string[] = [];
+  let group: KdbxGroup | undefined = entry.parentGroup;
+  while (group) {
+    const displayName =
+      recycleBinUuidId && group.uuid.id === recycleBinUuidId
+        ? "Lixeira"
+        : group.name || "(sem nome)";
+    path.unshift(displayName);
+    group = group.parentGroup;
+  }
+  return path.join(" / ");
+}
+
+/**
+ * Verifica se uma entry casa com a query de busca.
+ * Substring case-insensitive em Title + UserName + URL + Notes.
+ *
+ * Não inclui Password por segurança (ProtectedValue não é desprotegido
+ * durante typing — vide §15 sobre selectors do Zustand e §30 sobre
+ * critérios de segurança).
+ */
+export function matchesSearch(entry: KdbxEntry, query: string): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  const haystack = [
+    getTitle(entry),
+    getUsername(entry),
+    getUrl(entry),
+    getNotes(entry),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+/**
+ * Retorna array de partes do texto, com flag indicando se cada parte
+ * deve ser highlighted. Usado para renderizar o título com `<mark>`
+ * envolvendo trechos que casam com a query.
+ *
+ * Comparação case-insensitive, mas preserva o casing original do
+ * texto nos pedaços retornados (ex.: query "gma" em "GmailUser" →
+ * split com "Gma" highlighted, "ilUser" não).
+ *
+ * @example highlightMatch("gmail.com", "gma") returns:
+ *   [{ text: "gma", highlighted: true },
+ *    { text: "il.com", highlighted: false }]
+ */
+export function highlightMatch(
+  text: string,
+  query: string,
+): Array<{ text: string; highlighted: boolean }> {
+  if (!query) return [{ text, highlighted: false }];
+  const q = query.toLowerCase();
+  const lowerText = text.toLowerCase();
+  const parts: Array<{ text: string; highlighted: boolean }> = [];
+  let lastIndex = 0;
+  let index = lowerText.indexOf(q);
+  while (index !== -1) {
+    if (index > lastIndex) {
+      parts.push({
+        text: text.substring(lastIndex, index),
+        highlighted: false,
+      });
+    }
+    parts.push({
+      text: text.substring(index, index + query.length),
+      highlighted: true,
+    });
+    lastIndex = index + query.length;
+    index = lowerText.indexOf(q, lastIndex);
+  }
+  if (lastIndex < text.length) {
+    parts.push({ text: text.substring(lastIndex), highlighted: false });
+  }
+  return parts;
 }

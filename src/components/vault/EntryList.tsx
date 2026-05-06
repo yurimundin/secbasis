@@ -14,26 +14,41 @@ import { useEmptyRecycleBin } from "@/hooks/useEmptyRecycleBin";
 import { confirmDialog } from "@/lib/confirm";
 import {
   getAvatarColorClass,
+  getGroupPath,
   getInitials,
   getTitle,
   getUrl,
   getUsername,
+  highlightMatch,
+  matchesSearch,
 } from "@/lib/entry-helpers";
 import { cn } from "@/lib/utils";
 import {
   getGroupDisplayName,
   getHasUnsavedChanges,
+  useAllEntries,
   useCurrentGroup,
   useEntriesOfCurrentGroup,
   useIsCurrentGroupRecycleBin,
   useRecycleBinUuidId,
+  useSearchQuery,
   useVaultStore,
 } from "@/stores/vault";
 
 import { EmptyRecycleBinState } from "./EmptyRecycleBinState";
+import { EmptySearchResults } from "./EmptySearchResults";
 
 export function EntryList() {
-  const entries = useEntriesOfCurrentGroup();
+  // Search query vive no store (`setSearchQuery` no `VaultHeader` →
+  // re-render aqui). Ver §17. Reset automático em lock/unlock/setVault.
+  const searchQuery = useSearchQuery();
+  const isSearching = searchQuery.trim().length > 0;
+
+  const groupEntries = useEntriesOfCurrentGroup();
+  // `useAllEntries` é chamado sempre (hooks não podem ser condicionais) mas
+  // só usado quando a query tem texto. Memoização interna do hook evita
+  // re-walk recursivo desnecessário.
+  const allEntries = useAllEntries();
   const selectedEntryUuid = useVaultStore((s) => s.selectedEntryUuid);
   const selectedGroupUuid = useVaultStore((s) => s.selectedGroupUuid);
   const selectEntry = useVaultStore((s) => s.selectEntry);
@@ -45,11 +60,20 @@ export function EntryList() {
   const emptyRecycleBin = useEmptyRecycleBin();
   const [emptying, setEmptying] = useState(false);
 
+  // Fonte: durante busca, todas as entries (ex-Lixeira); fora dela,
+  // entries do grupo selecionado (comportamento antigo preservado).
+  const sourceEntries = isSearching ? allEntries : groupEntries;
+
+  const filteredEntries = useMemo(() => {
+    if (!isSearching) return sourceEntries;
+    return sourceEntries.filter((e) => matchesSearch(e, searchQuery));
+  }, [sourceEntries, searchQuery, isSearching]);
+
   const sorted = useMemo(() => {
-    return [...entries].sort((a, b) =>
+    return [...filteredEntries].sort((a, b) =>
       getTitle(a).localeCompare(getTitle(b), "pt-BR", { sensitivity: "base" }),
     );
-  }, [entries]);
+  }, [filteredEntries]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -139,51 +163,70 @@ export function EntryList() {
           Nome do grupo passa por `getGroupDisplayName` para traduzir
           "Recycle Bin" → "Lixeira" sem mexer no XML interno. */}
       <header className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-bg-secondary">
-        <span className="text-xs text-muted-foreground min-w-0 truncate">
-          {currentGroup && (
-            <span className="font-semibold text-foreground">
-              {getGroupDisplayName(currentGroup, recycleBinUuidId)}
+        {isSearching ? (
+          <span className="text-xs text-muted-foreground min-w-0 truncate">
+            <span className="font-semibold text-foreground">Resultados</span>
+            <span className="mx-1.5">·</span>
+            <span className="tabular-nums">
+              {sorted.length} {sorted.length === 1 ? "entrada" : "entradas"}
             </span>
-          )}
-          {currentGroup && <span className="mx-1.5">·</span>}
-          <span className="tabular-nums">
-            {sorted.length} {sorted.length === 1 ? "entrada" : "entradas"}
           </span>
-        </span>
-        {isRecycleBin ? (
-          sorted.length > 0 ? (
+        ) : (
+          <span className="text-xs text-muted-foreground min-w-0 truncate">
+            {currentGroup && (
+              <span className="font-semibold text-foreground">
+                {getGroupDisplayName(currentGroup, recycleBinUuidId)}
+              </span>
+            )}
+            {currentGroup && <span className="mx-1.5">·</span>}
+            <span className="tabular-nums">
+              {sorted.length} {sorted.length === 1 ? "entrada" : "entradas"}
+            </span>
+          </span>
+        )}
+        {/* Botões à direita escondidos durante busca: criar entry no
+            grupo "ativo" é ambíguo quando a lista mostra todos os grupos;
+            esvaziar Lixeira não faz sentido pois Lixeira está fora do
+            resultado. Após ESC volta tudo. */}
+        {!isSearching &&
+          (isRecycleBin ? (
+            sorted.length > 0 ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => void handleEmptyRecycleBin()}
+                disabled={emptying}
+                title="Apagar permanentemente todas as entradas da Lixeira"
+                aria-label="Esvaziar Lixeira"
+              >
+                <Trash2 />
+                {emptying ? "Esvaziando..." : "Esvaziar"}
+              </Button>
+            ) : null
+          ) : (
             <Button
               type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => void handleEmptyRecycleBin()}
-              disabled={emptying}
-              title="Apagar permanentemente todas as entradas da Lixeira"
-              aria-label="Esvaziar Lixeira"
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleCreate}
+              disabled={!selectedGroupUuid}
+              title="Nova entrada"
             >
-              <Trash2 />
-              {emptying ? "Esvaziando..." : "Esvaziar"}
+              <Plus />
             </Button>
-          ) : null
-        ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleCreate}
-            disabled={!selectedGroupUuid}
-            title="Nova entrada"
-          >
-            <Plus />
-          </Button>
-        )}
+          ))}
       </header>
 
       {sorted.length === 0 ? (
-        // Estado vazio: Lixeira ganha ilustração + mensagem educativa.
-        // Grupos normais mantêm o estado vazio mínimo herdado da Sessão 3
-        // (polir esses outros casos fica pra sessão futura de UX).
-        isRecycleBin ? (
+        // Estado vazio: durante busca, EmptySearchResults tem prioridade
+        // (cross-group, isRecycleBin do grupo selecionado é irrelevante).
+        // Fora de busca: Lixeira ganha ilustração; grupo normal o estado
+        // mínimo herdado da Sessão 3 (polir os outros casos é trabalho
+        // de UX futuro).
+        isSearching ? (
+          <EmptySearchResults query={searchQuery} />
+        ) : isRecycleBin ? (
           <div className="flex-1 overflow-hidden">
             <EmptyRecycleBinState />
           </div>
@@ -226,11 +269,36 @@ export function EntryList() {
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="block font-semibold text-sm truncate">
-                      {title}
+                      {/* Highlight do trecho que casa com a query.
+                          Aplicado APENAS durante busca e quando há
+                          título real (não no fallback "(sem título)"). */}
+                      {isSearching && getTitle(entry)
+                        ? highlightMatch(getTitle(entry), searchQuery).map(
+                            (part, i) =>
+                              part.highlighted ? (
+                                <mark
+                                  key={i}
+                                  className="bg-yellow-200 dark:bg-yellow-800/50 rounded-sm px-0.5"
+                                >
+                                  {part.text}
+                                </mark>
+                              ) : (
+                                <span key={i}>{part.text}</span>
+                              ),
+                          )
+                        : title}
                     </span>
                     {subtitle && (
                       <span className="block text-xs text-muted-foreground truncate">
                         {subtitle}
+                      </span>
+                    )}
+                    {/* Caminho do grupo abaixo do username quando busca
+                        ativa. Cor sutil (muted/70) para subordinar à
+                        info principal. */}
+                    {isSearching && (
+                      <span className="block text-xs text-muted-foreground/70 truncate">
+                        {getGroupPath(entry, recycleBinUuidId)}
                       </span>
                     )}
                   </span>

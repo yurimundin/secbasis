@@ -2,7 +2,7 @@
 //
 // Tabela canônica (ver §11 do CLAUDE.md):
 //   Ctrl+L                            → bloquear cofre
-//   Ctrl+K                            → focar input de busca (id="vault-search-input")
+//   Ctrl+F                            → focar input de busca (id="vault-search-input")
 //   Ctrl+C  (entry selecionada)       → copiar senha com auto-clear
 //   ↑/↓     (na sidebar/lista)         → navegar (tratado nos próprios componentes)
 //   Esc                               → desfocar elemento focado
@@ -43,10 +43,13 @@ export function useGlobalShortcuts(): void {
         return;
       }
 
-      if (key === "k") {
+      if (key === "f") {
         e.preventDefault();
         const input = document.getElementById("vault-search-input");
-        if (input instanceof HTMLInputElement) input.focus();
+        if (input instanceof HTMLInputElement) {
+          input.focus();
+          input.select();
+        }
         return;
       }
 

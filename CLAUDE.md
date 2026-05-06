@@ -594,7 +594,7 @@ Tarefa 8 — Auto-lock + auto-clear:
   indicador. NÃO reseta quando janela perde foco (continua contando se
   o usuário foi pra outro app).
 - [src/hooks/useGlobalShortcuts.ts](src/hooks/useGlobalShortcuts.ts):
-  Ctrl+L / Ctrl+K / Ctrl+C (entry sel.) / Esc.
+  Ctrl+L / Ctrl+F / Ctrl+C (entry sel.) / Esc.
 - Toast: `sonner` (componente shadcn, adaptado pra usar nosso
   `theme.ts` em vez de `next-themes`).
 
@@ -655,7 +655,7 @@ componentes de painel).
 | Atalho | Ação |
 |---|---|
 | `Ctrl+L` | Bloquear cofre (volta para a `UnlockScreen`) |
-| `Ctrl+K` | Focar input de busca no header |
+| `Ctrl+F` | Focar input de busca no header |
 | `Ctrl+C` | Copiar senha da entry selecionada com auto-clear (ignora se há texto selecionado ou foco em input) |
 | `Ctrl+E` | Entrar em modo edit na entry selecionada (em modo view, fora da Lixeira) |
 | `Ctrl+S` | Salvar (em modo edit/create — wire-up em [src/hooks/useCommitEdit.ts](src/hooks/useCommitEdit.ts)) |

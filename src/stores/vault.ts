@@ -99,6 +99,14 @@ interface VaultState {
    * `incrementVaultVersion()` em seguida. Ver §15 do CLAUDE.md.
    */
   vaultVersion: number;
+  /**
+   * Query de busca em tempo real (Sessão 17). Vive no store porque o
+   * input está no `VaultHeader` (global) e a lista filtrada está na
+   * `EntryList` — siblings que precisam compartilhar estado. Resetado
+   * ao trocar/bloquear/destravar o cofre (uma busca de um cofre não
+   * sobrevive ao próximo).
+   */
+  searchQuery: string;
 
   setVault(kdbx: Kdbx, filePath: string, keyFilePath: string | null): void;
   lock(): void;
@@ -136,6 +144,10 @@ interface VaultState {
    */
   incrementVaultVersion(): void;
 
+  /** Atualiza a query de busca global (driver da `EntryList` em modo
+   * cross-group). Ver §17 e `searchQuery` acima. */
+  setSearchQuery(query: string): void;
+
   /**
    * Hidrata `lastFilePath` (e opcionalmente `lastKeyFilePath`) sem
    * exigir uma instância de `Kdbx`. Usado APENAS no boot do app, a
@@ -161,6 +173,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   draftEntry: null,
   originalDraft: null,
   vaultVersion: 0,
+  searchQuery: "",
 
   setVault: (kdbx, filePath, keyFilePath) =>
     set({
@@ -174,6 +187,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       editMode: "view",
       draftEntry: null,
       originalDraft: null,
+      searchQuery: "",
     }),
 
   lock: () =>
@@ -186,6 +200,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       editMode: "view",
       draftEntry: null,
       originalDraft: null,
+      searchQuery: "",
     }),
 
   unlock: (kdbx) =>
@@ -197,6 +212,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       editMode: "view",
       draftEntry: null,
       originalDraft: null,
+      searchQuery: "",
     })),
 
   selectGroup: (uuid) =>
@@ -220,6 +236,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       editMode: "view",
       draftEntry: null,
       originalDraft: null,
+      searchQuery: "",
     }),
 
   enterEditMode: (entryUuid) => {
@@ -305,6 +322,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   incrementVaultVersion: () =>
     set((state) => ({ vaultVersion: state.vaultVersion + 1 })),
 
+  setSearchQuery: (query) => set({ searchQuery: query }),
+
   hydrateLastVault: (filePath, keyFilePath) =>
     set({
       lastFilePath: filePath,
@@ -328,6 +347,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
  */
 export function useIsLocked(): boolean {
   return useVaultStore((s) => s.kdbx === null && s.lastFilePath !== null);
+}
+
+/** Query de busca cross-group (Sessão 17). Driver da `EntryList`. */
+export function useSearchQuery(): string {
+  return useVaultStore((s) => s.searchQuery);
 }
 
 export function useCurrentGroup(): KdbxGroup | null {
@@ -365,6 +389,52 @@ export function useEntriesOfCurrentGroup(): KdbxEntry[] {
     const group = findGroupByUuidId(kdbx.getDefaultGroup(), selectedGroupUuid);
     return group?.entries ?? [];
   }, [kdbx, selectedGroupUuid, vaultVersion]);
+}
+
+/**
+ * Retorna TODAS as entries do cofre, EXCLUINDO as que estão na Lixeira
+ * (incluindo subgrupos da Lixeira). Usado pela busca cross-group da
+ * `EntryList` (Sessão 17).
+ *
+ * Memoização: re-computa quando `kdbx`, `vaultVersion` ou
+ * `recycleBinUuidId` mudam. `recycleBinUuidId` muda quando a Lixeira é
+ * criada/destruída — necessário para a exclusão da Lixeira ser correta
+ * em runtime.
+ *
+ * Mesmo padrão de `useEntriesOfCurrentGroup`: lógica em `useMemo` fora
+ * do selector para não criar array novo a cada chamada (ver §15).
+ */
+export function useAllEntries(): KdbxEntry[] {
+  const kdbx = useVaultStore((s) => s.kdbx);
+  const vaultVersion = useVaultStore((s) => s.vaultVersion);
+  const recycleBinUuidId = useRecycleBinUuidId();
+  return useMemo(() => {
+    if (!kdbx) return [];
+    const acc: KdbxEntry[] = [];
+    collectEntriesRecursive(kdbx.getDefaultGroup(), acc, recycleBinUuidId);
+    return acc;
+  }, [kdbx, vaultVersion, recycleBinUuidId]);
+}
+
+/**
+ * Walk recursivo sobre `group.groups`, coletando entries em `acc`.
+ * Pula a Lixeira inteira (e qualquer subgrupo dela) — quando o grupo
+ * atual é a Lixeira, retorna sem descer.
+ */
+function collectEntriesRecursive(
+  group: KdbxGroup,
+  acc: KdbxEntry[],
+  recycleBinUuidId: string | null,
+): void {
+  if (recycleBinUuidId !== null && group.uuid.id === recycleBinUuidId) {
+    return;
+  }
+  for (const entry of group.entries) {
+    acc.push(entry);
+  }
+  for (const child of group.groups) {
+    collectEntriesRecursive(child, acc, recycleBinUuidId);
+  }
 }
 
 /**

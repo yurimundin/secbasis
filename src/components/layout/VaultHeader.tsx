@@ -1,21 +1,26 @@
-// Header global do cofre aberto. Mostra nome do arquivo, busca
-// (placeholder por enquanto — tarefa para Sessão 4), indicador de
-// auto-lock e botão "Bloquear".
+// Header global do cofre. Inclui filename, busca cross-group (Sessão 17),
+// indicadores de save/auto-lock e botão Bloquear.
 
-import { Info, Lock as LockIcon, Search } from "lucide-react";
+import { Info, Lock as LockIcon } from "lucide-react";
 import { useState } from "react";
 
 import { AboutDialog } from "@/components/AboutDialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/vault/SearchInput";
 import { requestLockWithGuard } from "@/lib/lock-flow";
-import { useHasUnsavedChanges, useVaultStore } from "@/stores/vault";
+import {
+  useHasUnsavedChanges,
+  useSearchQuery,
+  useVaultStore,
+} from "@/stores/vault";
 
 import { AutoLockIndicator } from "./AutoLockIndicator";
 
 export function VaultHeader() {
   const filePath = useVaultStore((s) => s.filePath);
   const hasUnsavedChanges = useHasUnsavedChanges();
+  const searchQuery = useSearchQuery();
+  const setSearchQuery = useVaultStore((s) => s.setSearchQuery);
   const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
@@ -27,12 +32,12 @@ export function VaultHeader() {
         {baseName(filePath)}
       </span>
 
-      <div className="flex-1 max-w-md relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-        <Input
+      <div className="flex-1 max-w-md">
+        <SearchInput
           id="vault-search-input"
-          placeholder="Buscar entradas... (Ctrl+K)"
-          className="pl-8 h-8"
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Buscar entradas... (Ctrl+F)"
         />
       </div>
 
