@@ -1889,3 +1889,55 @@ otimização futura, mas isso é hipotético.
 registro persistido) → conjunto vazio → todos os grupos colapsados.
 A UX inicial sempre mostra o primeiro nível porque o nó raiz tem
 `forceExpanded`.
+
+---
+
+## 28. PRs de Dependabot stale (Sessão 12)
+
+**Contexto:** Dependabot abre PRs em branches separadas para atualizações
+de dependências. Se um PR ficar aberto sem ser mergeado por várias
+sessões, a branch fica "stale" — baseada em commit antigo do `main`,
+sem as features adicionadas depois. Mergear um PR stale via "Squash and
+merge" do GitHub UI **pode silenciosamente reverter** trabalho recente
+quando os arquivos divergem demais.
+
+**Como verificar se PR é seguro de mergear:**
+
+```bash
+git fetch origin
+git diff main origin/dependabot/<branch-name> -- package.json
+git diff --stat main origin/dependabot/<branch-name>
+git log main..origin/dependabot/<branch-name> --oneline
+git log origin/dependabot/<branch-name>..main --oneline | wc -l
+```
+
+Sinais de PR stale:
+- Diff stat com **deleções massivas** em arquivos não relacionados a
+  dependências (ex: arquivos `.tsx`, `.rs`, docs)
+- `git log main..PR_branch` mostra apenas 1 commit (`chore(deps)...`)
+- `git log PR_branch..main` mostra **muitos commits** que o PR não tem
+
+Se for PR stale, **NÃO mergear via GitHub UI**. Opções:
+
+1. **Fechar PR** (mais seguro): Dependabot reabre em base limpa no
+   próximo schedule. Atrasa update por ~1 semana mas zero risco.
+2. **`@dependabot rebase`**: comentar no PR; Dependabot tenta rebase
+   automático. Pode falhar com conflitos grandes.
+3. **Aplicar manualmente**: cherry-pick das mudanças em branch nova
+   baseada em main atual. Sessão dedicada.
+
+**Decisão de processo Sec.Basis:** Caminho 1 (fechar). Atraso aceitável
+para dev dependencies. Major bumps merecem sessão própria de qualquer
+forma. Quando o PR reabrir limpo, avaliar deps individualmente.
+
+**Histórico:**
+- **PR fechado (Sessão 12):** `dependabot/npm_and_yarn/dev-dependencies-2f25c8d3ab`
+  — branch baseada em `caffd14` (Sessão 4.5), 15 commits atrás de
+  `58c0be9` (Sessão 11). Propunha 3 major bumps: vite 7→8,
+  typescript 5→6, @vitejs/plugin-react 4→6. Mergear teria deletado
+  ~25 arquivos das Sessões 5-11. Fechado para Dependabot reabrir em
+  base limpa.
+
+**Lição:** PRs de Dependabot precisam de `git diff` antes de qualquer
+ação. UI do GitHub não protege contra stale merge se os arquivos
+divergem entre branches.
