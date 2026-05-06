@@ -98,7 +98,7 @@ Princípios de design que guiam o projeto:
   - ✅ Auto-open do último cofre usado (estilo KeePass — pré-preenche path, senha sempre exigida)
   - ✅ Tela "Sobre" com versão e links (acessível pelo botão Info no header)
   - ✅ Subgrupos expansíveis na sidebar (hierarquia recursiva, persistência por cofre)
-  - 🚧 Busca em tempo real
+  - ✅ Busca em tempo real (substring case-insensitive em Title/UserName/URL/Notes, cross-group excluindo Lixeira, atalho Ctrl+F)
   - 🚧 Empacotamento e distribuição Windows (instalador .msi/.exe via site oficial)
 
 - **Fase 2:** YubiKey, TOTP, anexos, importação Bitwarden/1Password/LastPass,

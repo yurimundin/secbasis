@@ -769,6 +769,10 @@ Repositório público: <https://github.com/yurimundin/secbasis>
 
 | Hash | Tipo | Descrição |
 |---|---|---|
+| `77e5712` | feat | real-time search across all entries (S17) |
+| `ba813a0` | docs | document Windows packaging strategic plan (CLAUDE.md §32) (S16) |
+| `6a363df` | docs | document Smart App Control / MOTW gotcha for Tauri (CLAUDE.md §31) (S15) |
+| `6c75758` | docs | align CLAUDE.md §14 with project state through Session 14 (S14.5) |
 | `2575be6` | docs | document devDependency vulnerability process (CLAUDE.md §30) (S14) |
 | `a61cb31` | chore | add basic CI workflow (GitHub Actions with tsc + cargo check) (S13) |
 | `3831767` | docs | document Dependabot stale PR lesson (CLAUDE.md §28) (S12) |
@@ -951,13 +955,51 @@ de correção.
   - §30 estabelece framework de 4 critérios para avaliação de
     vulnerabilidades em devDependencies — distinto do critério §25
     (Linux-only, target de build) por ser fase de ciclo de vida (dev).
+- ✅ **Sessão 15 — Smart App Control gotcha + housekeeping documental
+  + lição §31** (`6a363df` + `6c75758`):
+  - Erro `os error 4551` em `tauri dev` rastreado até Smart App Control
+    (SAC) bloqueando build-scripts e o próprio `secbasis.exe` quando
+    pasta do projeto está em `Downloads/` (Mark-of-the-Web).
+  - Workaround: mover projeto para `C:\dev\` ou path equivalente fora
+    de pastas com MOTW; alternativa é exclusão de Defender + aprovação
+    via Explorer do `.exe` final (SmartScreen).
+  - `6c75758` alinhou §14 com S14 (drift de 4 commits acumulado).
+  - §31 documenta o gotcha completo + caminhos de mitigação.
+- ✅ **Sessão 16 — Empacotamento Windows planejamento estratégico**
+  (`ba813a0`):
+  - §32 documenta plano estratégico para empacotamento + distribuição
+    Windows (instalador .msi/.exe via site oficial), incluindo escopo
+    de assinatura digital e SmartScreen reputation.
+  - Sessão de planejamento — implementação fica para sessão futura
+    dedicada (item 🚧 ainda no Roadmap Fase 1).
+- ✅ **Sessão 17 — Busca em tempo real cross-group + revogação
+  consciente de §11** (`77e5712`):
+  - Busca em tempo real implementada no `VaultHeader` (input antes
+    placeholder desde S3): substring case-insensitive em Title +
+    UserName + URL + Notes, cross-group excluindo Lixeira.
+  - `searchQuery` no Zustand store (siblings VaultHeader↔EntryList
+    precisam compartilhar). Reset em lock/unlock/setVault/reset.
+  - Novos helpers em `entry-helpers.ts`: `getGroupPath`,
+    `matchesSearch`, `highlightMatch`. Novo selector `useAllEntries`
+    em `vault.ts`. Novos componentes `SearchInput.tsx` e
+    `EmptySearchResults.tsx`.
+  - Atalho `Ctrl+K` (documentado em §11) **revogado conscientemente**
+    em favor de `Ctrl+F` — alinhamento com KeePassXC e
+    browsers/editors. ID `vault-search-input` preservado como contrato
+    estável; §8 e §11 atualizados nesta mesma sessão.
+  - Implementação em 4 fases (S17 inicial: input local na EntryList +
+    Ctrl+F local) refatorada em 3 fases (R1: state pro store; R2:
+    input pro VaultHeader; R3: shortcut centralizado em
+    `useGlobalShortcuts`) após smoke test revelar input morto
+    paralelo no header. 1 commit consolidado.
 
-**Próximo:** Sessão 16 — busca em tempo real ou empacotamento Windows
-(itens 🚧 do Roadmap Fase 1). Outras pendências: rollback in-memory
-em erros de save, code-splitting, major upgrades de deps (vite 7→8,
-typescript 5→6, @vitejs/plugin-react 4→6 — sessão dedicada). Validação
-diferida: ativar branch protection com CI obrigatório após 1-2 semanas
-de funcionamento estável (decisão da Sessão 13).
+**Próximo:** Sessão 18 — trabalho de feature ou qualidade conforme
+prioridade. Pendências abertas: empacotamento Windows (sessão dedicada,
+ver §32), rollback in-memory em erros de save, code-splitting (~565 KB),
+major upgrades de deps (vite 7→8, typescript 5→6,
+@vitejs/plugin-react 4→6 — sessão dedicada), adicionar ESLint + plugin
+react-hooks + CI step. Validação diferida: ativar branch protection com
+CI obrigatório após 1-2 semanas (decisão da Sessão 13).
 
 ---
 
