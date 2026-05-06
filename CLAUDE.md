@@ -2169,3 +2169,167 @@ que Smart App Control não bloqueia mais.
 durante build" em Windows 11 são frequentemente Smart App Control,
 não bug de código. Investigar variável de ambiente `MOTW` antes de
 debug profundo de Cargo/Tauri/PATH/permissions.
+
+---
+
+## 32. Empacotamento Windows — planejamento estratégico (Sessão 16)
+
+**Status:** planejamento documentado. Implementação será feita em
+sessão dedicada quando os pré-requisitos estiverem resolvidos.
+
+### Contexto
+
+Sec.Basis é o primeiro produto sob o domínio `basis.app.br` (família
+de aplicações). Decisões de empacotamento são tomadas considerando
+que:
+
+- Sec.Basis é e permanecerá 100% FOSS gratuito, sem versão paga,
+  licenciamento comercial, ou freemium.
+- O projeto opera atualmente sem entidade jurídica registrada, com
+  possível registro futuro sujeito a análise individual.
+- Sem entidade jurídica, code signing fica limitado a Standard Code
+  Signing como pessoa física — EV Code Signing é inviável (exige
+  CNPJ na maioria dos fornecedores).
+
+### Decisões cravadas
+
+**Formato:**
+
+- **Instalador: MSI** (não NSIS). Padrão corporativo, formal,
+  alinhado com posicionamento profissional do produto. Tauri suporta
+  MSI nativamente via WiX (`bundle.windows.wix` em `tauri.conf.json`).
+- **Identificador do bundle:** a definir em sessão de empacotamento
+  real (`bundle.identifier` em formato reverse-DNS, provavelmente
+  `app.basis.sec` ou similar).
+
+**Code signing — estratégia de adiamento:**
+
+- **Alpha:** sai SEM code signing. Público técnico (developers, early
+  adopters) tolera warnings de "publisher unknown" via Windows
+  Defender SmartScreen ("More info → Run anyway").
+- **Beta:** também SEM code signing. Decisão consciente de adiar
+  investimento em certificado até resolver questões de entidade. Beta
+  sem signing é prática comum em projetos FOSS pequenos; KeePass
+  histórico operou anos sem signing perfeito.
+- **1.0 release:** COM code signing. Tipo de cert e Publisher name
+  dependem do estado da entidade no momento — decisão final adiada
+  para quando 1.0 estiver no horizonte.
+- **Custo evitado:** ~US$ 200-400/ano em Standard cert, multiplicado
+  por anos de espera = US$ 200-1.200+ que ficam disponíveis para o
+  projeto crescer organicamente sem pressão de cerimônia.
+
+**Distribuição:**
+
+- **Canais primários:** GitHub Releases + `sec.basis.app.br`.
+- **GitHub Releases:** gratuito, integrado, padrão FOSS. Tag
+  versionada (`v0.1.0-alpha`, `v0.2.0-alpha`, etc.).
+- **Site oficial:** link direto para asset do GitHub Release (não
+  duplicar hosting). Reduz manutenção.
+- **Sem outros canais inicialmente:** sem Microsoft Store, Chocolatey,
+  Scoop, winget. Avaliar pós-1.0 se demanda surgir.
+
+### Decisões diferidas (resolver em sessões futuras)
+
+**Antes do 1.0 release (pré-requisitos):**
+
+1. **Decisão sobre entidade jurídica.** Se entidade for confirmada
+   como viável, registrar antes do 1.0. Se mantida pessoa física,
+   seguir com Standard cert PF.
+
+2. **Fornecedor de certificado.** Candidatos a investigar quando
+   momento chegar:
+   - Sectigo (~US$ 200/ano, vários resellers)
+   - SSL.com (~US$ 250/ano)
+   - DigiCert (~US$ 400/ano, premium)
+
+   Critérios: custo total, processo KYC, jurisdição, suporte ao
+   Brasil, reviews recentes, compatibilidade com `signtool.exe` ou
+   `osslsigncode`.
+
+3. **Workflow de release no GitHub Actions.** Provavelmente:
+   - Trigger: push de tag `v*`
+   - Build em runner Windows (não Ubuntu — release real precisa
+     Windows)
+   - `tauri build` produz MSI
+   - Code signing via `signtool.exe` (após cert disponível)
+   - Upload de assets para GitHub Release
+   - Atualização do site oficial (link direto para asset)
+
+4. **Publisher name no certificado.** Decisão depende do estado da
+   entidade quando o cert for adquirido. Variantes (sigla, iniciais)
+   dependem de aceitação do fornecedor — alguns só emitem com nome
+   exato do documento.
+
+5. **Auto-update mechanism (opcional).** Tauri suporta auto-update
+   via `tauri-plugin-updater`. Decidir entre:
+   - Manter manual (usuário re-baixa) — mais simples, padrão FOSS
+     pequeno
+   - Auto-update (mais complexo, requer endpoint próprio para
+     metadata, hosting de releases assinadas)
+
+6. **Smart App Control e build de release.** §31 documenta
+   `error 4551` em pasta com MOTW. Build de release pode bater no
+   mesmo problema. Pré-requisito: mover projeto para `C:\dev\secbasis`
+   antes do primeiro `tauri build` de release.
+
+### Roteiro estimado para sessão de empacotamento real
+
+Quando os pré-requisitos estiverem resolvidos (entidade decidida,
+fornecedor de cert escolhido, cert adquirido), a sessão dedicada
+provavelmente terá:
+
+1. Mover projeto para `C:\dev\secbasis` (se ainda em `Downloads/`)
+2. Configurar `tauri.conf.json` para release (`bundle.windows.wix`,
+   `bundle.identifier`, ícones, metadata)
+3. Criar workflow `.github/workflows/release.yml` com trigger em
+   push de tag
+4. Importar certificado no runner (via secret + decode em base64)
+5. Configurar `signCommand` ou `signtool` no Tauri config
+6. Validar build local (`tauri build` → MSI no
+   `src-tauri/target/release/bundle/msi/`)
+7. Validar instalação em VM Windows limpa (UAC prompt, Add/Remove
+   Programs, atalhos, desinstalação)
+8. Push de tag de teste (`v0.0.0-test`) para validar workflow
+9. Documentar processo final em §32 atualizada e novo §33 (workflow
+   de release)
+
+Tempo estimado dessa sessão real: 4-6 horas + período de validação
+em VM. Não cabe em sessão "rápida".
+
+### Riscos identificados
+
+- **Smart App Control bloqueando build de release** (vide §31).
+  Mitigação: mover para `C:\dev\` antes.
+- **`tauri build` quebrando funcionalidades que `tauri dev` não pega.**
+  MSI carrega assets de forma diferente. Validar em VM limpa, não em
+  máquina de desenvolvimento.
+- **Cert sendo invalidado se chave privada vazar.** Hardware token
+  (não usado em Standard) protege contra isso. Standard exige guarda
+  cuidadosa do `.pfx` + senha. Preferência: armazenar como GitHub
+  Secret encrypted, nunca em disco local.
+- **Custo do cert renovando anualmente.** Sec.Basis sem monetização
+  → renovação sai do bolso pessoal. Decisão de seguir ou não pode
+  ser revisitada anualmente.
+- **Microsoft SmartScreen reputation.** Cert standard começa com
+  reputação zero. Primeiros downloads ainda mostram warning até
+  reputação acumular (~50-100 downloads). Documentar para usuários
+  quando momento chegar.
+
+### Lição operacional
+
+Empacotamento profissional não é só `tauri build`. É decisão
+estratégica que envolve:
+
+- Identidade jurídica (pessoa física vs entidade)
+- Investimento financeiro recorrente (cert anual)
+- Processo de release reproduzível (workflow CI/CD)
+- Validação em ambiente isolado (VM, não dev machine)
+- Comunicação com usuários (warnings esperados, processo de
+  instalação)
+
+Adiar empacotamento até que decisões estratégicas estejam resolvidas
+é prudência, não procrastinação. Sec.Basis em alpha/beta pode rodar
+como `npm run tauri dev` para early adopters técnicos, ou via build
+não-assinado para usuários FOSS-friendly, sem prejuízo. Empacotamento
+assinado entra quando a foundation legal/financeira estiver
+estabelecida.
