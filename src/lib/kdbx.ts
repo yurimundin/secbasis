@@ -328,16 +328,13 @@ export type DeleteResult =
  * magic-check, ver §17 do CLAUDE.md). NÃO lança — sempre retorna
  * `DeleteResult`.
  *
- * Trade-off em caso de erro de save: o `kdbx` em memória já tem a entry
- * movida (a kdbxweb mutou in-place antes do save), mas o disco ainda
- * tem a versão antiga. Por simplicidade, NÃO revertemos in-memory:
- *
- * - Recarregar do disco exigiria re-derivar chave / re-abrir cofre,
- *   complexidade alta para um caminho de erro raro.
- * - Próximo `saveVault` bem-sucedido vai persistir o move (consistência
- *   eventual).
- * - Hook chamador (`useDeleteEntry`) decide se incrementa
- *   `vaultVersion` mesmo em erro (refletir UI) ou não.
+ * Em caso de erro de save: rollback in-memory automático — a entry é
+ * movida de volta para o parent original. Edge case: se a Lixeira foi
+ * criada nesta operação (não existia antes), ela permanece em memória
+ * como Lixeira vazia órfã. Esse estado é válido no formato KDBX e será
+ * persistido consistentemente no próximo save bem-sucedido. kdbxweb
+ * não expõe API para destruir Lixeira; reverter manipulando
+ * `meta.recycleBinUuid` teria risco de corrupção.
  */
 export async function moveEntryToRecycleBin(
   filePath: string,
@@ -349,6 +346,11 @@ export async function moveEntryToRecycleBin(
   }
 
   try {
+    // Snapshot ANTES de qualquer mutação para rollback em caso de
+    // erro de save. Captura o parent original da entry; a Lixeira
+    // recém-criada (se houver) é aceita como estado órfão (vide docstring).
+    const originalParent = entry.parentGroup;
+
     let recycleBin: KdbxGroup | undefined;
     const existingUuid = kdbx.meta.recycleBinUuid;
     if (existingUuid && !existingUuid.empty) {
@@ -381,6 +383,12 @@ export async function moveEntryToRecycleBin(
 
     const result = await saveVault(filePath, kdbx);
     if (!result.ok) {
+      // Rollback: voltar entry para o parent original.
+      // Lixeira recém-criada (se houver) permanece como estado órfão
+      // válido — ver docstring.
+      if (originalParent) {
+        kdbx.move(entry, originalParent);
+      }
       return { ok: false, error: result.error };
     }
 
@@ -414,10 +422,9 @@ export type RestoreResult =
  * magic-check, ver §17 do CLAUDE.md). NÃO lança — sempre retorna
  * `RestoreResult`.
  *
- * Mesmo trade-off do `moveEntryToRecycleBin` em caso de erro de save:
- * o `kdbx` em memória já foi mutado; o disco mantém o estado antigo.
- * Próximo `saveVault` bem-sucedido vai persistir o restore junto.
- * TODO Sessão 6: rollback in-memory em erro.
+ * Em caso de erro de save: rollback in-memory automático — a entry é
+ * movida de volta para a Lixeira (parentGroup original), preservando
+ * a consistência entre estado em memória e disco.
  */
 export async function restoreEntryFromRecycleBin(
   filePath: string,
@@ -450,10 +457,18 @@ export async function restoreEntryFromRecycleBin(
       return { ok: false, error: "Grupo raiz não encontrado no cofre." };
     }
 
+    // Snapshot ANTES da mutação para rollback em caso de erro de save.
+    const originalParent = entry.parentGroup;
+
     kdbx.move(entry, root);
 
     const result = await saveVault(filePath, kdbx);
     if (!result.ok) {
+      // Rollback: voltar entry para o parent original (Lixeira).
+      // Mantém estado in-memory consistente com o disco.
+      if (originalParent) {
+        kdbx.move(entry, originalParent);
+      }
       return { ok: false, error: result.error };
     }
 
