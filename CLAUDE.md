@@ -46,7 +46,7 @@ open source.
 | Estado global    | **Zustand**                                 |
 | Ícones           | **lucide-react**                            |
 
-**Identifier do app (Tauri / Microsoft Store):** `com.secbasis.app`
+**Identifier do app (Tauri / Microsoft Store):** `app.basis.sec`
 **Janela inicial:** 1100×720, mínimo 800×600.
 
 ---
