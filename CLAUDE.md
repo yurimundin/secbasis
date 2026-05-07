@@ -769,6 +769,8 @@ Repositório público: <https://github.com/yurimundin/secbasis>
 
 | Hash | Tipo | Descrição |
 |---|---|---|
+| `15b30d4` | chore | add ESLint with flat config + audit existing eslint-disable comments (S18) |
+| `fc0e708` | docs | align README and CLAUDE.md §14 with project state through Session 17 (S17.5) |
 | `77e5712` | feat | real-time search across all entries (S17) |
 | `ba813a0` | docs | document Windows packaging strategic plan (CLAUDE.md §32) (S16) |
 | `6a363df` | docs | document Smart App Control / MOTW gotcha for Tauri (CLAUDE.md §31) (S15) |
@@ -992,14 +994,34 @@ de correção.
     input pro VaultHeader; R3: shortcut centralizado em
     `useGlobalShortcuts`) após smoke test revelar input morto
     paralelo no header. 1 commit consolidado.
+- ✅ **Sessão 18 — ESLint setup com flat config + audit de
+  eslint-disable comments** (`15b30d4`):
+  - ESLint 9.x configurado com flat config (typescript-eslint +
+    react-hooks + react-refresh)
+  - 3º job paralelo no CI (typescript + lint + rust)
+  - Strict mode (`--max-warnings=0`) — qualquer warning falha o lint
+  - Override shadcn para `src/components/ui/**` (cva variants
+    exportadas com componente são padrão upstream)
+  - 6 supressões documentadas em §33 (5 em `vault.ts` para
+    `vaultVersion` cache-buster §15 + 1 em `CreateVaultTab.tsx`
+    para sanitização de filename)
+  - Auditoria descobriu 4 disables órfãos pré-existentes (sem
+    ESLint instalado, sem efeito real) — 2 removidos como
+    "Unused eslint-disable directive", 2 mantidos (suprimiam
+    regras reais)
+  - Convenção de supressão cravada: comentário explicativo acima
+    + disable nu (sintaxe `rule -- reason` inline não funciona no
+    ESLint vanilla — texto após disable é parsed como nome de regra)
 
-**Próximo:** Sessão 18 — trabalho de feature ou qualidade conforme
-prioridade. Pendências abertas: empacotamento Windows (sessão dedicada,
-ver §32), rollback in-memory em erros de save, code-splitting (~565 KB),
-major upgrades de deps (vite 7→8, typescript 5→6,
-@vitejs/plugin-react 4→6 — sessão dedicada), adicionar ESLint + plugin
-react-hooks + CI step. Validação diferida: ativar branch protection com
-CI obrigatório após 1-2 semanas (decisão da Sessão 13).
+**Próximo:** Sessão 19 — trabalho de qualidade (code-splitting do
+bundle ~565 KB, rollback in-memory em erros de save) ou trabalho
+documental. Pendências abertas: empacotamento Windows (sessão
+dedicada, ver §32), major upgrades de deps em sessões separadas
+(plugin-react 4→6, vite 7→8, typescript 5.8→6.0 — investigação na
+S19 confirmou que TS 6.0 é bridge agressivo com `strict: true` por
+padrão e várias mudanças silenciosas; merece sessão dedicada
+exclusiva). Validação diferida: ativar branch protection com 3 jobs
+obrigatórios após 1-2 semanas (decisão da Sessão 13).
 
 ---
 
