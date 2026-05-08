@@ -4,7 +4,6 @@
 // - `view`  → renderiza o detalhe READ-ONLY (este componente).
 // - `edit`/`create` → delega ao `EntryEditor`.
 
-import { open as openExternal } from "@tauri-apps/plugin-shell";
 import {
   Copy,
   ExternalLink,
@@ -34,6 +33,7 @@ import {
   getUrl,
   getUsername,
 } from "@/lib/entry-helpers";
+import { openExternalSafe } from "@/lib/external";
 import {
   getGroupDisplayName,
   useCurrentEntry,
@@ -145,11 +145,7 @@ export function EntryDetail() {
 
   async function handleOpenUrl() {
     if (!url) return;
-    try {
-      await openExternal(url);
-    } catch (err) {
-      console.error("[shell.open] falhou:", err);
-    }
+    await openExternalSafe(url);
   }
 
   function handleEdit() {

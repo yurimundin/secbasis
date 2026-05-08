@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
+import { PoweredByBasis } from "@/components/layout/PoweredByBasis";
 import { confirmDialog } from "@/lib/confirm";
 import { useSettingsStore } from "@/stores/settings";
 import {
@@ -197,21 +198,24 @@ export function GroupSidebar() {
   return (
     <aside
       ref={containerRef}
-      className="border-r border-border overflow-y-auto p-2 space-y-0.5"
+      className="border-r border-border flex flex-col h-full"
       onKeyDown={(e) => void handleKeyDown(e)}
     >
-      {tree.map((rootNode) => (
-        <GroupTreeItem
-          key={rootNode.uuid}
-          node={rootNode}
-          selectedGroupUuid={selectedGroupUuid}
-          expanded={true}
-          forceExpanded={true}
-          onSelect={(uuid) => void handleSelect(uuid)}
-          onToggleExpanded={handleToggleExpanded}
-          isExpanded={isExpanded}
-        />
-      ))}
+      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        {tree.map((rootNode) => (
+          <GroupTreeItem
+            key={rootNode.uuid}
+            node={rootNode}
+            selectedGroupUuid={selectedGroupUuid}
+            expanded={true}
+            forceExpanded={true}
+            onSelect={(uuid) => void handleSelect(uuid)}
+            onToggleExpanded={handleToggleExpanded}
+            isExpanded={isExpanded}
+          />
+        ))}
+      </div>
+      <PoweredByBasis />
     </aside>
   );
 }

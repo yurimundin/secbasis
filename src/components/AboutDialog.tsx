@@ -5,10 +5,9 @@
 // (com licença inline), botão Fechar.
 //
 // Sem chamadas de rede — alinhado com o princípio offline-first. Os
-// links externos abrem no navegador padrão do sistema via plugin-shell
-// (mesmo padrão de EntryDetail.tsx para abrir URLs de entries).
-
-import { open as openExternal } from "@tauri-apps/plugin-shell";
+// links externos abrem no navegador padrão do sistema via
+// `openExternalSafe` (`src/lib/external.ts`, S21 — antes era função
+// local duplicada com EntryDetail.tsx).
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAppVersion } from "@/hooks/useAppVersion";
+import { openExternalSafe } from "@/lib/external";
 
 interface AboutDialogProps {
   open: boolean;
@@ -31,14 +31,6 @@ const REPO_URL = "https://github.com/yurimundin/secbasis";
 
 export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
   const version = useAppVersion();
-
-  async function openExternalSafe(url: string) {
-    try {
-      await openExternal(url);
-    } catch (err) {
-      console.error("[shell.open] falhou:", err);
-    }
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
