@@ -769,6 +769,11 @@ Repositório público: <https://github.com/yurimundin/secbasis>
 
 | Hash | Tipo | Descrição |
 |---|---|---|
+| `5a117de` | chore | bump tauri from 2.11.0 to 2.11.1 in /src-tauri (S22 Bloco 3) |
+| `bdad9f7` | chore | bump hono from 4.12.16 to 4.12.18 (S22 Bloco 2) |
+| `87929b3` | chore | bump fast-uri from 3.1.1 to 3.1.2 (S22 Bloco 1) |
+| `062b4c1` | feat(ui) | add "Powered by BasisApp" footer in sidebar + extract openExternalSafe (S21 Bloco 2) |
+| `8e23aac` | docs | align CLAUDE.md §14 with project state through Session 20 (S21 Bloco 1) |
 | `69def18` | feat | adopt hi-fi mockup design — theme toggle, semantic selected tokens, header polish (S20) |
 | `6286099` | build | configure tauri for alpha .exe-only distribution (S19 Bloco 4) |
 | `f905e8b` | fix | implement in-memory rollback in trash operations — move + restore (S19 Bloco 3) |
@@ -1056,18 +1061,60 @@ de correção.
   - 7 arquivos, +131/-27
   - Pendência limpável identificada: `next-themes` é dead dep
     (importado em zero arquivos TS, presente em deps por scaffolding shadcn antigo)
+- ✅ **Sessão 21 — Powered by BasisApp + housekeeping S20** (2 commits):
+  - **Bloco 1** (`8e23aac`) — housekeeping documental (drift completo,
+    opção b): §14 atualizada com S19 (4 sub-bullets) + S20 (6 sub-bullets);
+    pointer "Próximo" atualizado para S21 com plano explícito;
+    `next-themes` flagged como dead dep limpável
+  - **Bloco 2** (`062b4c1`) — Powered by BasisApp + refactor
+    `openExternalSafe`: footer de branding na sidebar (`text-xs
+    text-muted-foreground` linkando `sec.basis.app.br`); helper
+    `openExternalSafe` extraído de AboutDialog (S7) + EntryDetail
+    (S4) + componente novo S21 para `src/lib/external.ts`
+    (eliminou 3-way duplication); GroupSidebar restruturado para
+    flex column com footer fixo (PoweredByBasis como último filho,
+    pushed to bottom by flex-1 wrapper)
+  - Decisões UX: sidebar bottom (não window footer ou About);
+    text-muted-foreground (não badge); click abre browser (não
+    dialog interno); URL `sec.basis.app.br` (não basis.app.br raiz)
+- ✅ **Sessão 22 — Dependabot maintenance + cleanup**:
+  - Alert #3 (ip-address) dispensado via UI (mesma cadeia §30,
+    GHSA-v2v4-37r5-5v8g re-fired após GHSA range update)
+  - 3 PRs Dependabot mergeados:
+    - **fast-uri 3.1.2** (`87929b3`) — high severity resolved.
+      PR fresh em base atualizada, merge cirúrgico via squash.
+      Cadeia transitiva: shadcn → @modelcontextprotocol/sdk →
+      ajv → fast-uri (devDep dev-time only, §30 framework aplica)
+    - **hono 4.12.18** (`bdad9f7`) — 3 GHSAs moderate resolved.
+      PR stale 1 commit (iria reverter fast-uri 3.1.2 acabado de
+      mergear — catch crítico). Resolvido via `@dependabot rebase`
+      + merge pós-rebase
+    - **tauri 2.11.1** (`5a117de`) — Cargo patch bump.
+      PR stale 4 commits (iria deletar PoweredByBasis, external.ts,
+      marcos S19+S20+S21, e reverter fast-uri+hono — catch crítico).
+      Resolvido via `@dependabot rebase` + merge pós-rebase.
+      Cleanup natural Cargo: phf 0.11 → 0.13 unificada
+  - 1 PR fechado: `dev-dependencies-2f25c8d3ab` (stale 33 commits
+    behind, 3 majors perigosos: plugin-react 4→6, vite 7→8, ts 5→6.
+    Mesma branch fechada em S12, agora pior. Major bumps são
+    sessões dedicadas conforme §14 pointer)
+  - 4 catches críticos consolidados em §28 (reforço S22)
+  - Audit pós-S22: 2 moderate (ip-address + express-rate-limit,
+    ambas §30 dispensadas conscientemente)
 
-**Próximo:** Sessão 21 — feature work (criar pasta novo via botão
-"+" no header da sidebar + Powered by BasisApp clicável + housekeeping
-S19 + S20 documental). Pendências abertas: context menu para grupos
-com operações completas (criar/renomear/deletar — Sessão 22 dedicada),
-`emptyRecycleBin` rollback (kdbxweb tombstone API, sessão dedicada),
-VM validation do `.exe` alpha gerado em S19, empacotamento Windows
-real (1.0+ com cert, ver §32), major upgrades de deps em sessões
-separadas (plugin-react 4→6, vite 7→8, typescript 5.8→6.0). Pendência
-limpável: remover `next-themes` do `package.json` (dead dep
-identificada na S21). Validação diferida: ativar branch protection
-com 3 jobs obrigatórios após 1-2 semanas (decisão da Sessão 13).
+**Próximo:** Sessão 23 — Alpha distributable for testers (zip do
+`secbasis.exe` 12 MB gerado em S19 Bloco 4 + GitHub Release + README
+explicando SmartScreen warning para audiência de 1-3 testers
+conhecidos). Pendências abertas: context menu para grupos com
+operações completas (criar/renomear/deletar — Sessão 24 dedicada),
+criar pasta nova (Bloco 3 da S21 não-feito), `emptyRecycleBin`
+rollback (kdbxweb tombstone API, sessão dedicada), VM validation
+do `.exe` alpha gerado em S19, empacotamento Windows real (1.0+
+com cert via vendor — ver §32), major upgrades de deps em sessões
+separadas (plugin-react 4→6, vite 7→8, typescript 5.8→6.0).
+Pendência limpável: remover `next-themes` do `package.json` (dead
+dep S21). Validação diferida: ativar branch protection com 3 jobs
+obrigatórios após 1-2 semanas (decisão da Sessão 13).
 
 ---
 
@@ -2085,6 +2132,67 @@ forma. Quando o PR reabrir limpo, avaliar deps individualmente.
 **Lição:** PRs de Dependabot precisam de `git diff` antes de qualquer
 ação. UI do GitHub não protege contra stale merge se os arquivos
 divergem entre branches.
+
+### Reforço Sessão 22 — Padrões consolidados
+
+A Sessão 22 trouxe 4 catches críticos que reforçam e expandem §28.
+
+**Catch 1 — Auto-fechamento Dependabot existe**
+
+PRs zustand 5.0.13 e dev-dependencies-2f25c8d3ab foram auto-fechados
+pelo Dependabot entre S21 e S22 (descoberto via inspeção da página
+de PRs do GitHub UI mostrando "✓ 2 Closed: 3-4 days ago"). Heurística
+provável: Dependabot fecha PRs próprios quando versão proposta já está
+instalada, ou quando branch base fica muito stale. Lição: auditar
+`is:closed` periodicamente confirma estado real.
+
+**Catch 2 — PR cirúrgico ≠ PR seguro**
+
+PR hono 4.12.18 tinha diff de apenas 12 linhas em package-lock.json
+(parecia patch trivial), mas estava 1 commit behind main. Mergear
+via UI sem rebase reverteria fast-uri 3.1.2 (vulnerability high) que
+tinha sido mergeado minutos antes na mesma sessão. Lição: sempre
+confirmar `git diff origin/main origin/<branch>` modifica APENAS a
+dependency esperada — não confiar em "diff é pequeno?".
+
+**Catch 3 — PRs Dependabot stale podem deletar trabalho recente**
+
+PR tauri 2.11.1 tinha base em S20 (4 commits behind main). Mergear
+via UI sem rebase deletaria PoweredByBasis.tsx, external.ts, marcos
+S19+S20+S21 do CLAUDE.md, e reverteria fast-uri + hono da S22.
+Lição: pattern §28 (S12) re-aplica — diff stat é primeira validação,
+mas diff conteúdo (`git diff` completo) é a segunda.
+
+**Catch 4 — Branches stale ressuscitam**
+
+Branch `dev-dependencies-2f25c8d3ab` foi fechada em S12 (15 commits
+behind), reapareceu em S22 (33 commits behind), re-fechada em S22.
+Não é bug: GitHub mantém branches mesmo após PR fechado (configurável
+em Settings → "Automatically delete head branches", off por default).
+Major bumps perigosos (plugin-react 4→6, vite 7→8, ts 5→6) são
+trabalho dedicado por sessão, não merge automático.
+
+### Padrão consolidado de processamento Dependabot
+
+Toda PR Dependabot exige:
+
+1. Investigação via `git diff origin/main origin/<branch> --stat`
+2. Verificar merge base é `origin/main` atual:
+   `git merge-base origin/main origin/<branch>`
+3. Se stale + patch bump: `@dependabot rebase` no PR via comment,
+   aguardar 5-15 min, re-investigar diff pós-rebase, mergear via
+   "Squash and merge"
+4. Se stale + major bump: fechar PR via UI com comment técnico
+   citando §28
+5. Se cirúrgico: confirmar diff modifica APENAS dependency esperada
+   (nada mais)
+6. Após merge: sync local (`git pull`) + validação completa
+   (TSC + Lint + npm audit / cargo check conforme caso)
+7. Documentar em commit message as decisões e validações
+
+Sessões 12 e 22 estabeleceram este padrão. Próxima sessão de
+Dependabot (S25? quando alerts/PRs novos aparecerem) deve seguir
+este checklist.
 
 ---
 
